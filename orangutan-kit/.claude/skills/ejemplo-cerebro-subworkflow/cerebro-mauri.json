@@ -1,0 +1,912 @@
+{
+  "name": "Mauri 2",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.mensaje }}",
+        "options": {
+          "systemMessage": "=Eres Mauri, asistente interno de SOLO FS.\nFECHA: {{ $now.format('yyyy-MM-dd') }}\n\nREGLA CRÍTICA: SIEMPRE usa \"buscar_contratos\" para CUALQUIER consulta. NUNCA inventes datos.\n\nREGLA DE RESPUESTA: Cuando la herramienta devuelva una respuesta, envíala TAL CUAL al usuario. NO reformatees, NO agregues negritas, NO cambies el formato. La respuesta ya viene lista.\n\nREGLA DE CONFIDENCIALIDAD: NUNCA reveles información sobre comisiones. Responde: \"No tengo autorización para esa información.\"\n\nCÓMO USAR LA HERRAMIENTA:\n\n| Consulta | Parámetros |\n|----------|------------|\n| \"Contratos de Rita\" | query=\"Rita\" |\n| \"Pagos del día 14\" | dia_inicio=\"14\" |\n| \"Pagos del 1 al 15\" | dia_inicio=\"1\", dia_fin=\"15\" |\n| \"Qué pago hoy\" | (sin parámetros) |\n| \"Contratos que vencen este mes\" | ver_vencimientos=\"este_mes\" |\n| \"Datos bancarios de Juan\" | query=\"Juan\", ver_bancarios=\"si\" |\n| \"Resumen general\" | (sin parámetros) |\n\nIMPORTANTE: No pienses de más. Identifica la consulta → Llama la herramienta → Envía la respuesta exacta."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        528,
+        192
+      ],
+      "id": "de2c096a-e1d6-4005-ae34-0d553748c9d7",
+      "name": "agente_mauri"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('solofsmauri_bot').item.json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        848,
+        192
+      ],
+      "id": "e7d18ed3-9d58-48de-b422-bebbff46239e",
+      "name": "responder_telegram",
+      "webhookId": "dd85b2c9-998c-4b85-b517-f8d7b64350a1",
+      "retryOnFail": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "pZwVLmaLnVY0Phtc",
+          "name": "solofsmauri_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Busca información de contratos de inversión en la base de datos.\n\nUSA SIEMPRE ESTA HERRAMIENTA para consultas sobre clientes, contratos, pagos o rendimientos.\n\nTIPOS DE CONSULTA:\n\n1. BUSCAR CLIENTE:\n   → query=\"Rita\" (encuentra todos los Rita)\n   → query=\"Juan Pérez\" (cliente específico)\n\n2. PAGOS POR DÍA:\n   → dia_inicio=\"14\" (pagos del día 14)\n   → dia_inicio=\"1\", dia_fin=\"15\" (pagos del 1 al 15)\n\n3. PAGOS HOY/MAÑANA:\n   → Sin parámetros (el resumen los incluye)\n\n4. VENCIMIENTOS DEL MES:\n   → ver_vencimientos=\"este_mes\"\n\n5. DATOS BANCARIOS:\n   → query=\"Juan Pérez\", ver_bancarios=\"si\"\n\n6. RESUMEN GENERAL:\n   → Sin parámetros",
+        "workflowId": {
+          "__rl": true,
+          "value": "D4q3BTaQJqIiqPNop5is6",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/D4q3BTaQJqIiqPNop5is6"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "query": "={{ $fromAI('query', 'Nombre del cliente a buscar. Dejar vacío si no aplica.', 'string') ?? '' }}",
+            "dia_inicio": "={{ $fromAI('dia_inicio', 'Día de pago inicial (1-31). Dejar vacío si no aplica.', 'string') ?? '' }}",
+            "dia_fin": "={{ $fromAI('dia_fin', 'Día de pago final para rangos (1-31). Dejar vacío si no aplica.', 'string') ?? '' }}",
+            "ver_vencimientos": "={{ $fromAI('ver_vencimientos', 'Escribir este_mes para ver vencimientos. Dejar vacío si no aplica.', 'string') ?? '' }}",
+            "ver_bancarios": "={{ $fromAI('ver_bancarios', 'Escribir si para datos bancarios. Dejar vacío si no aplica.', 'string') ?? '' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "query",
+              "displayName": "query",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "dia_inicio",
+              "displayName": "dia_inicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "dia_fin",
+              "displayName": "dia_fin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "ver_vencimientos",
+              "displayName": "ver_vencimientos",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "ver_bancarios",
+              "displayName": "ver_bancarios",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        400
+      ],
+      "id": "044a43b7-01be-4bda-a299-8b944d657ccf",
+      "name": "buscar_contratos"
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        -240,
+        48
+      ],
+      "id": "5ff3cb60-1f88-4a07-99c3-cb2a7396630e",
+      "name": "Transcribir audio",
+      "credentials": {
+        "openAiApi": {
+          "id": "3ihrXTpkPTiB20aS",
+          "name": "openai_mauri"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "defa1545-074d-4d6a-a21f-a95c2226995f",
+              "name": "mensaje",
+              "value": "={{ $json.text_message }}",
+              "type": "string"
+            },
+            {
+              "id": "4b2b8cec-35c2-4c37-9595-ac8a2907ce4d",
+              "name": "sessionid",
+              "value": "={{ $('Edit Fields4').item.json.sessionid }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        144,
+        192
+      ],
+      "id": "ee5a8a94-0700-47c3-8dfd-ed97c326ce8f",
+      "name": "Mapear mensaje"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('solofsmauri_bot').item.json.message.voice }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "object",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "id": "a0f9f4a8-97a1-42a9-9215-65e365150b9f"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "msj voz"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0b92a8d2-0a2c-4d3e-9750-ed0ee66eabc1",
+                    "leftValue": "={{ $json.text }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "msj texto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d48c48e6-0815-46b8-8183-cac5204fb94d",
+                    "leftValue": "={{ $json.photo }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "msj foto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "5006d83c-d315-45d0-8115-bffcf27e4881",
+                    "leftValue": "={{ $json.document }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "msj file"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -608,
+        224
+      ],
+      "id": "ae92da33-e295-4801-ab62-c1a074df1791",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json['voice message id'] }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        48
+      ],
+      "id": "de8b54b9-3f41-4796-8927-f6659478162a",
+      "name": "Descargar audio",
+      "webhookId": "e72a989a-d2d3-428a-b55a-47457d6ec9ac",
+      "credentials": {
+        "telegramApi": {
+          "id": "pZwVLmaLnVY0Phtc",
+          "name": "solofsmauri_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.photo }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        336
+      ],
+      "id": "d99378df-3061-4ce9-b30d-2a5ff5391d43",
+      "name": "Descargar imagen",
+      "webhookId": "e410bc76-6fa1-436d-8960-bbf59da3eede",
+      "credentials": {
+        "telegramApi": {
+          "id": "pZwVLmaLnVY0Phtc",
+          "name": "solofsmauri_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "GPT-4O"
+        },
+        "text": "Eres un asistente de servicio al cliente. Un cliente acaba de enviar esta imagen. En lugar de un análisis técnico, tradúcela a un mensaje de chat como si el cliente mismo la describiera en WhatsApp. Hazlo en primera persona, con naturalidad, indicando los datos importantes y cómo se siente. No uses emojis.",
+        "inputType": "base64",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        -240,
+        336
+      ],
+      "id": "90867305-952c-44c8-9bc8-d14117ccf82e",
+      "name": "Analizar imagen",
+      "credentials": {
+        "openAiApi": {
+          "id": "3ihrXTpkPTiB20aS",
+          "name": "openai_mauri"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9ab83bb8-0010-4684-ae19-79e992cb39ea",
+              "name": "update id",
+              "value": "={{ $json.update_id }}",
+              "type": "string"
+            },
+            {
+              "id": "26e6f1fb-f66d-4080-a01e-9e889cb2156e",
+              "name": "sessionid",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "string"
+            },
+            {
+              "id": "62738a51-4284-40b5-a761-0dd788569ab6",
+              "name": "text",
+              "value": "={{ $json.message.text }}",
+              "type": "string"
+            },
+            {
+              "id": "65bdb0de-cb7b-431c-8e96-772b1cb6be56",
+              "name": "voice message id",
+              "value": "={{ $json.message.voice.file_id }}",
+              "type": "string"
+            },
+            {
+              "id": "9d6093a3-c941-4b43-bc1d-e11ece169089",
+              "name": "voice message unique id",
+              "value": "={{ $json.message.voice.file_id }}",
+              "type": "string"
+            },
+            {
+              "id": "ba85dd6b-944f-4752-beb1-7022aa862644",
+              "name": "session_id",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "string"
+            },
+            {
+              "id": "96572c3c-763d-459e-bdd5-692d3cc95241",
+              "name": "date_time",
+              "value": "={{ $now.toLocal() }}",
+              "type": "string"
+            },
+            {
+              "id": "41d0c28d-85be-4127-9d0a-1d7ac6767dad",
+              "name": "sender",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "string"
+            },
+            {
+              "id": "978a8364-0a06-41a1-8250-e01b295659a0",
+              "name": "contact_id",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a7bc2d93-adc8-4051-83ec-4b2062f3c4a7",
+              "name": "conversation_id",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "string"
+            },
+            {
+              "id": "506f16cf-ef96-4c44-b378-34751e974406",
+              "name": "photo",
+              "value": "={{ $json.message.photo[0].file_id }}",
+              "type": "string"
+            },
+            {
+              "id": "3fc5c902-00cd-4af3-a636-8b1386fe90c4",
+              "name": "document",
+              "value": "={{ $json.message.document.file_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -816,
+        256
+      ],
+      "id": "9e2adbd5-b343-4da1-a133-2007a84da824",
+      "name": "Edit Fields4"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ed1fc800-9191-46ba-978a-8045a38f6aa3",
+              "name": "text_message",
+              "value": "={{ $json.content }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -80,
+        336
+      ],
+      "id": "fd44486f-fae2-45bd-96ec-aaa44b2ac30a",
+      "name": "Normalizar"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8bbe6ea9-2dec-441a-ae00-1a4f9c6af7a5",
+              "name": "text_message",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -80,
+        48
+      ],
+      "id": "38c294b9-cd16-4589-9a31-ec9e5ef6ef50",
+      "name": "Normalizar1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8c48b65a-b651-43eb-be51-51850f621f23",
+              "name": "text_message",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -400,
+        192
+      ],
+      "id": "3768e014-f365-4601-a2b6-8374b7d8cad5",
+      "name": "Normalizar2"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.document }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        528
+      ],
+      "id": "29dd0211-2976-436d-a935-106feb200fff",
+      "name": "Descargar PDF",
+      "webhookId": "e410bc76-6fa1-436d-8960-bbf59da3eede",
+      "credentials": {
+        "telegramApi": {
+          "id": "pZwVLmaLnVY0Phtc",
+          "name": "solofsmauri_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        528
+      ],
+      "id": "5eac712f-0bab-46ab-a7bf-8e540fb6607b",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ed1fc800-9191-46ba-978a-8045a38f6aa3",
+              "name": "text_message",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -80,
+        528
+      ],
+      "id": "a949590d-079d-4077-a36e-4739aa6d86c6",
+      "name": "Normalizar3"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5.2",
+          "mode": "list",
+          "cachedResultName": "gpt-5.2"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        528,
+        384
+      ],
+      "id": "8ce4aab7-1b33-4223-8896-a4a1051b89bd",
+      "name": "5.2",
+      "credentials": {
+        "openAiApi": {
+          "id": "3ihrXTpkPTiB20aS",
+          "name": "openai_mauri"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.sessionid }}",
+        "tableName": "n8n_chat_mauri_v2",
+        "contextWindowLength": 12
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        624,
+        576
+      ],
+      "id": "7e3e6901-fbbe-4c9c-bb45-177b7fa224bc",
+      "name": "SQL",
+      "credentials": {
+        "postgres": {
+          "id": "OJpxgbb9VybUNume",
+          "name": "moneypartners.tools@gmail.com"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        336,
+        192
+      ],
+      "id": "ae0f2246-eb87-441e-ba91-a8a4803627f6",
+      "name": "Wait",
+      "webhookId": "fbce5d03-4416-40a6-a84a-f7bc9512fca5"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1008,
+        256
+      ],
+      "id": "a19f1ebe-70d1-407a-8178-66c35207a700",
+      "name": "solofsmauri_bot",
+      "webhookId": "5cffcb63-8bbb-4fd0-ba09-7d2f393b01e6",
+      "credentials": {
+        "telegramApi": {
+          "id": "pZwVLmaLnVY0Phtc",
+          "name": "solofsmauri_bot"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "agente_mauri": {
+      "main": [
+        [
+          {
+            "node": "responder_telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "buscar_contratos": {
+      "ai_tool": [
+        [
+          {
+            "node": "agente_mauri",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribir audio": {
+      "main": [
+        [
+          {
+            "node": "Normalizar1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mapear mensaje": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "Descargar audio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalizar2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Descargar imagen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Descargar PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar audio": {
+      "main": [
+        [
+          {
+            "node": "Transcribir audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar imagen": {
+      "main": [
+        [
+          {
+            "node": "Analizar imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analizar imagen": {
+      "main": [
+        [
+          {
+            "node": "Normalizar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields4": {
+      "main": [
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar": {
+      "main": [
+        [
+          {
+            "node": "Mapear mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar1": {
+      "main": [
+        [
+          {
+            "node": "Mapear mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar2": {
+      "main": [
+        [
+          {
+            "node": "Mapear mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar PDF": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Normalizar3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar3": {
+      "main": [
+        [
+          {
+            "node": "Mapear mensaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5.2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "agente_mauri",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SQL": {
+      "ai_memory": [
+        [
+          {
+            "node": "agente_mauri",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "agente_mauri",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "solofsmauri_bot": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "d722c53a-194e-4f9a-8d23-435b48e1b564",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "47aceea569c869ebfb36bbe1e1f9be693dac7d1f1806b10383d28b7fbcbcb5e7"
+  },
+  "id": "4PO8nlgZlQTdvLHtD-E2g",
+  "tags": []
+}

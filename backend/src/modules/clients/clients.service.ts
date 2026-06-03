@@ -1,0 +1,158 @@
+import { query, queryOne } from '../../config/database';
+import { createError } from '../../middleware/errorHandler';
+
+export type ServicePlan = 'basic' | 'professional' | 'premium';
+
+export interface ClientProfile {
+  id:                    string;
+  user_id:               string;
+  business_name:         string;
+  description:           string | null;
+  photo_1_url:           string | null;
+  photo_2_url:           string | null;
+  photo_3_url:           string | null;
+  plan:                  ServicePlan;
+  brand_logo_url:        string | null;
+  brand_primary_color:   string | null;
+  brand_secondary_color: string | null;
+  brand_font:            string | null;
+  setup_completed:       boolean;
+  created_at:            string;
+  updated_at:            string;
+}
+
+export async function getProfile(userId: string): Promise<ClientProfile> {
+  const profile = await queryOne<ClientProfile>(
+    'SELECT * FROM client_profiles WHERE user_id = $1',
+    [userId],
+  );
+  if (!profile) throw createError('Perfil no encontrado', 404);
+  return profile;
+}
+
+export async function updateProfile(
+  userId:       string,
+  businessName: string,
+  description:  string,
+): Promise<ClientProfile> {
+  const profile = await queryOne<ClientProfile>(
+    `UPDATE client_profiles
+     SET business_name = $1, description = $2
+     WHERE user_id = $3
+     RETURNING *`,
+    [businessName, description, userId],
+  );
+  if (!profile) throw createError('Perfil no encontrado', 404);
+  return profile;
+}
+
+export async function updatePhotos(
+  userId:    string,
+  photo1Url: string | null,
+  photo2Url: string | null,
+  photo3Url: string | null,
+): Promise<ClientProfile> {
+  const current = await getProfile(userId);
+
+  const p1 = photo1Url ?? current.photo_1_url;
+  const p2 = photo2Url ?? current.photo_2_url;
+  const p3 = photo3Url ?? current.photo_3_url;
+
+  const setupCompleted = !!(
+    (current.business_name || '').trim() &&
+    p1 && p2 && p3
+  );
+
+  const profile = await queryOne<ClientProfile>(
+    `UPDATE client_profiles
+     SET photo_1_url = $1, photo_2_url = $2, photo_3_url = $3,
+         setup_completed = $4
+     WHERE user_id = $5
+     RETURNING *`,
+    [p1, p2, p3, setupCompleted, userId],
+  );
+  if (!profile) throw createError('Perfil no encontrado', 404);
+  return profile;
+}
+
+export async function completeSetup(
+  userId:       string,
+  businessName: string,
+  description:  string,
+  photo1Url:    string | null,
+  photo2Url:    string | null,
+  photo3Url:    string | null,
+): Promise<ClientProfile> {
+  const profile = await queryOne<ClientProfile>(
+    `UPDATE client_profiles
+     SET business_name = $1, description = $2,
+         photo_1_url = $3, photo_2_url = $4, photo_3_url = $5,
+         setup_completed = TRUE
+     WHERE user_id = $6
+     RETURNING *`,
+    [businessName, description, photo1Url, photo2Url, photo3Url, userId],
+  );
+  if (!profile) throw createError('Perfil no encontrado', 404);
+  return profile;
+}
+
+export async function getAllClients() {
+  return query<ClientProfile & { email: string; role: string; is_active: boolean }>(
+    `SELECT u.id, u.email, u.role, u.is_active, u.created_at,
+            cp.business_name, cp.description, cp.setup_completed,
+            cp.photo_1_url, cp.photo_2_url, cp.photo_3_url
+     FROM users u
+     LEFT JOIN client_profiles cp ON cp.user_id = u.id
+     WHERE u.role = 'client'
+     ORDER BY u.created_at DESC`,
+  );
+}
+
+export async function updatePlan(userId: string, plan: ServicePlan): Promise<ClientProfile> {
+  const profile = await queryOne<ClientProfile>(
+    'UPDATE client_profiles SET plan = $1 WHERE user_id = $2 RETURNING *',
+    [plan, userId],
+  );
+  if (!profile) throw createError('Perfil no encontrado', 404);
+  return profile;
+}
+
+export async function updateBrand(
+  userId: string,
+  brand:  { primaryColor?: string; secondaryColor?: string; font?: string },
+): Promise<ClientProfile> {
+  const profile = await queryOne<ClientProfile>(
+    `UPDATE client_profiles
+     SET brand_primary_color = COALESCE($1, brand_primary_color),
+         brand_secondary_color = COALESCE($2, brand_secondary_color),
+         brand_font = COALESCE($3, brand_font)
+     WHERE user_id = $4
+     RETURNING *`,
+    [brand.primaryColor ?? null, brand.secondaryColor ?? null, brand.font ?? null, userId],
+  );
+  if (!profile) throw createError('Perfil no encontrado', 404);
+  return profile;
+}
+
+export async function updateBrandLogo(userId: string, logoUrl: string): Promise<ClientProfile> {
+  const profile = await queryOne<ClientProfile>(
+    'UPDATE client_profiles SET brand_logo_url = $1 WHERE user_id = $2 RETURNING *',
+    [logoUrl, userId],
+  );
+  if (!profile) throw createError('Perfil no encontrado', 404);
+  return profile;
+}
+
+export async function getClientById(id: string) {
+  const client = await queryOne<ClientProfile & { email: string }>(
+    `SELECT u.id, u.email, u.role, u.is_active, u.created_at,
+            cp.business_name, cp.description, cp.setup_completed,
+            cp.photo_1_url, cp.photo_2_url, cp.photo_3_url, cp.updated_at
+     FROM users u
+     LEFT JOIN client_profiles cp ON cp.user_id = u.id
+     WHERE u.id = $1 AND u.role = 'client'`,
+    [id],
+  );
+  if (!client) throw createError('Cliente no encontrado', 404);
+  return client;
+}

@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg:        #06060f;
+    --surface:   #0d0d1f;
+    --raised:    #141428;
+    --elevated:  #1e1e35;
+    --border:    rgba(255, 255, 255, 0.07);
+    --border-md: rgba(255, 255, 255, 0.13);
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    @apply antialiased font-sans;
+    background-color: var(--bg);
+    color: #e2e8f0;
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: #3a3a5c; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
+}
+
+@layer components {
+  .surface        { background-color: var(--surface);  border: 1px solid var(--border); }
+  .surface-raised { background-color: var(--raised);   border: 1px solid var(--border); }
+  .surface-elev   { background-color: var(--elevated); border: 1px solid var(--border-md); }
+  .gradient-text  { @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-violet-400; }
+  .label          { @apply text-xs font-medium text-slate-500 uppercase tracking-wider; }
+}

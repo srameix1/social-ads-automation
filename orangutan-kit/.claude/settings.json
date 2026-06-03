@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Edit(*)",
+      "Write(*)",
+      "WebFetch(*)",
+      "WebSearch",
+      "mcp__*"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(sudo rm -rf *)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Check if this session involved significant work (creating/modifying n8n workflows, building agents, writing system prompts, configuring tools). If significant work was done but progreso.md was NOT updated with what was built and decisions made, respond NOT ok and explain that progreso.md needs updating before stopping. If progreso.md was already updated OR only minor/conversational work was done, respond ok."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat progreso.md 2>/dev/null || echo 'No hay progreso.md aun - primera sesion del proyecto'"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '⚠️ Auto-compactación detectada. Guardando snapshot...' && date >> progreso.md && echo '---SNAPSHOT PRE-COMPACT---' >> progreso.md && echo 'Contexto compactado automáticamente. Revisar decisiones arriba.' >> progreso.md"
+          }
+        ]
+      }
+    ]
+  }
+}

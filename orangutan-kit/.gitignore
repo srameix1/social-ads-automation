@@ -1,0 +1,19 @@
+# Credenciales del cliente - NUNCA commitear
+CLAUDE.local.md
+.claude/settings.local.json
+
+# n8n API keys están en .mcp.json - CUIDADO si commiteas
+# Considera usar .mcp.json en gitignore si el repo es público
+# .mcp.json
+
+# Node modules
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~

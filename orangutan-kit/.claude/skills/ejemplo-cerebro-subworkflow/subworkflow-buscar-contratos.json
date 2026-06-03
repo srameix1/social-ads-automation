@@ -1,0 +1,412 @@
+{
+  "name": "BuscarContratosSOLOFS",
+  "nodes": [
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1A6cvfvLgz2jeA7ev0QofRZr9-pB_bw0V9T9BhwZehmk",
+          "mode": "list",
+          "cachedResultName": "Contrato20220904-RastreoDepositos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1A6cvfvLgz2jeA7ev0QofRZr9-pB_bw0V9T9BhwZehmk/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 872556292,
+          "mode": "list",
+          "cachedResultName": "RelContratos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1A6cvfvLgz2jeA7ev0QofRZr9-pB_bw0V9T9BhwZehmk/edit#gid=872556292"
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "detectAutomatically"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -928,
+        112
+      ],
+      "id": "3a8b28d6-8458-4246-8f76-0f92b3ff8fa7",
+      "name": "google_sheets_mauri",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "TpEzLjcUSd2oNr4H",
+          "name": "araceli.mendoza.s@gmail.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const contratos = $input.all().map(item => item.json);\nconst inputData = $('trigger_herramienta').first().json;\nconst query = inputData.query?.toLowerCase()?.trim() || '';\nconst diaInicio = inputData.dia_inicio || inputData.dia || '';\nconst diaFin = inputData.dia_fin || '';\nconst verVencimientos = inputData.ver_vencimientos || '';\nconst verBancarios = inputData.ver_bancarios || '';\n\n// Fecha de hoy sin hora\nconst hoy = new Date();\nhoy.setHours(0, 0, 0, 0);\nconst diaHoy = hoy.getDate();\nconst mesHoy = hoy.getMonth();\nconst anioHoy = hoy.getFullYear();\n\n// Fecha de mañana\nconst manana = new Date(hoy);\nmanana.setDate(manana.getDate() + 1);\nconst diaManana = manana.getDate();\n\n// Quitar tildes para búsqueda\nfunction sinTildes(str) {\n  return String(str || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\n// Limpiar número (quitar comas)\nfunction limpiarNumero(valor) {\n  if (!valor) return 0;\n  const limpio = String(valor).replace(/,/g, '').replace(/[^0-9.-]/g, '');\n  return parseFloat(limpio) || 0;\n}\n\n// Calcular fecha final del contrato\nfunction calcularFechaFinal(inicio, meses) {\n  if (!inicio || !meses) return null;\n  const fecha = new Date(inicio);\n  fecha.setMonth(fecha.getMonth() + parseInt(meses));\n  fecha.setHours(0, 0, 0, 0);\n  return fecha;\n}\n\n// Formatear fecha legible\nfunction formatearFecha(fecha) {\n  if (!fecha) return 'N/A';\n  return fecha.toISOString().split('T')[0];\n}\n\n// ⭐ LÓGICA ACTUALIZADA: Verificar si contrato está activo\nfunction estaActivo(c) {\n  // REGLA #1: Si Estatus Operativo contiene CANCELADO → INACTIVO\n  const estatusOperativo = String(c['Estatus Operativo'] || '').toUpperCase();\n  if (estatusOperativo.includes('CANCELADO')) return false;\n  \n  // REGLA #2: Revisar Estatus Contrato\n  const estatusContrato = String(c['Estatus Contrato'] || '').toUpperCase();\n  \n  // Si es VENCIDO o POR ACTIVAR → INACTIVO\n  if (estatusContrato === 'VENCIDO' || estatusContrato === 'POR ACTIVAR') return false;\n  \n  // Si es ACTIVO o POR VENCER → ACTIVO\n  if (estatusContrato === 'ACTIVO' || estatusContrato === 'POR VENCER') return true;\n  \n  // Si no tiene estatus definido, usar fecha como fallback\n  const fechaFinal = calcularFechaFinal(c.Inicio, c.Meses);\n  if (!fechaFinal) return false;\n  return hoy <= fechaFinal;\n}\n\n// Procesar todos los contratos\nlet todosContratos = contratos.map(c => {\n  const fechaFinal = calcularFechaFinal(c.Inicio, c.Meses);\n  return {\n    ...c,\n    FechaFinal: fechaFinal,\n    FechaFinalStr: formatearFecha(fechaFinal),\n    ContratoActivo: estaActivo(c),\n    MensualNum: limpiarNumero(c.Mensual),\n    CapitalNum: limpiarNumero(c.Capital)\n  };\n});\n\nlet respuesta = '';\nlet crearSheet = false;\nlet datosParaSheet = [];\nlet tituloSheet = '';\n\n// ========== CONSULTA DE VENCIMIENTOS ==========\nif (verVencimientos === 'este_mes') {\n  const vencenEsteMes = todosContratos.filter(c => {\n    if (!c.FechaFinal || !c.ContratoActivo) return false;\n    return c.FechaFinal.getMonth() === mesHoy && c.FechaFinal.getFullYear() === anioHoy;\n  });\n  \n  const porUSD = vencenEsteMes.filter(c => c.Moneda === 'USD');\n  const porCAD = vencenEsteMes.filter(c => c.Moneda === 'CAD');\n  \n  // Si son más de 15, crear Sheet\n  if (vencenEsteMes.length > 15) {\n    crearSheet = true;\n    tituloSheet = `Vencimientos_${anioHoy}-${String(mesHoy+1).padStart(2,'0')}`;\n    datosParaSheet = vencenEsteMes.map(c => ({\n      Nombre: c.Nombre,\n      Capital: c.Capital,\n      Moneda: c.Moneda,\n      Mensual: c.Mensual,\n      Dia_Pago: c.Dia,\n      Fecha_Vencimiento: c.FechaFinalStr,\n      Estatus: c['Estatus Contrato']\n    }));\n    respuesta = `📅 VENCIMIENTOS ESTE MES: ${vencenEsteMes.length} contratos\\n\\n💵 USD: ${porUSD.length}\\n🍁 CAD: ${porCAD.length}\\n\\n⏳ Generando reporte en Google Sheets...`;\n  } else {\n    respuesta = `📅 CONTRATOS QUE VENCEN ESTE MES:\\n\\nTotal: ${vencenEsteMes.length} contratos\\n\\n`;\n    if (porUSD.length > 0) {\n      respuesta += `💵 USD (${porUSD.length}):\\n`;\n      porUSD.forEach(c => { respuesta += `• ${c.Nombre}: $${c.Capital}, vence ${c.FechaFinalStr}\\n`; });\n      respuesta += `\\n`;\n    }\n    if (porCAD.length > 0) {\n      respuesta += `🍁 CAD (${porCAD.length}):\\n`;\n      porCAD.forEach(c => { respuesta += `• ${c.Nombre}: $${c.Capital}, vence ${c.FechaFinalStr}\\n`; });\n    }\n    if (vencenEsteMes.length === 0) respuesta = `No hay contratos que venzan este mes.`;\n  }\n  \n  return [{ json: { respuesta, crearSheet, datosParaSheet, tituloSheet } }];\n}\n\n// ========== FILTRAR CONTRATOS ACTIVOS ==========\nlet resultado = todosContratos.filter(c => c.ContratoActivo);\n\n// Filtrar por nombre si hay query\nif (query) {\n  const queryNorm = sinTildes(query).toLowerCase();\n  resultado = resultado.filter(c => sinTildes(c.Nombre).toLowerCase().includes(queryNorm));\n}\n\n// Filtrar por día o rango de días\nif (diaInicio) {\n  const diaIni = parseInt(diaInicio);\n  const diaF = diaFin ? parseInt(diaFin) : diaIni;\n  resultado = resultado.filter(c => {\n    const dia = parseInt(c.Dia);\n    return dia >= diaIni && dia <= diaF;\n  });\n}\n\n// Agrupar por divisa\nconst porUSD = resultado.filter(c => c.Moneda === 'USD');\nconst porCAD = resultado.filter(c => c.Moneda === 'CAD');\nconst totalUSD = porUSD.reduce((sum, c) => sum + c.MensualNum, 0);\nconst totalCAD = porCAD.reduce((sum, c) => sum + c.MensualNum, 0);\nconst nombresUnicos = [...new Set(resultado.map(c => c.Nombre))];\n\n// ========== CONSULTA DE DATOS BANCARIOS ==========\nif (verBancarios === 'si' && query) {\n  respuesta = `🏦 DATOS BANCARIOS:\\n\\n`;\n  if (resultado.length === 0) {\n    respuesta = `No encontré cliente con nombre \"${query}\".`;\n  } else if (nombresUnicos.length > 1) {\n    respuesta = `Encontré ${nombresUnicos.length} clientes con \"${query}\":\\n`;\n    nombresUnicos.forEach((nombre, i) => { respuesta += `${i + 1}. ${nombre}\\n`; });\n    respuesta += `\\n¿De cuál quieres los datos bancarios?`;\n  } else {\n    nombresUnicos.forEach(nombre => {\n      const contrato = resultado.find(c => c.Nombre === nombre);\n      respuesta += `👤 ${nombre}\\n💰 Divisa: ${contrato.Moneda}\\n`;\n      const cuenta = String(contrato.Cuenta || '').trim();\n      respuesta += cuenta !== '' ? `💳 Datos:\\n${cuenta}\\n` : `⚠️ Sin datos bancarios registrados\\n`;\n    });\n  }\n  return [{ json: { respuesta, crearSheet: false, datosParaSheet: [], tituloSheet: '' } }];\n}\n\n// ========== CASO: No hay resultados ==========\nif (resultado.length === 0 && (query || diaInicio)) {\n  respuesta = `No encontré contratos activos${query ? ` para \"${query}\"` : ''}${diaInicio ? ` con día de pago ${diaInicio}${diaFin ? ` al ${diaFin}` : ''}` : ''}.`;\n  return [{ json: { respuesta, crearSheet: false, datosParaSheet: [], tituloSheet: '' } }];\n}\n\n// ========== CASO: Múltiples clientes con mismo nombre ==========\nif (nombresUnicos.length > 1 && query) {\n  respuesta = `Encontré ${nombresUnicos.length} clientes con \"${query}\":\\n`;\n  nombresUnicos.forEach((nombre, i) => {\n    const contratosCliente = resultado.filter(c => c.Nombre === nombre);\n    respuesta += `${i + 1}. ${nombre} (${contratosCliente.length} contrato${contratosCliente.length > 1 ? 's' : ''})\\n`;\n  });\n  respuesta += `\\n¿Cuál te interesa?`;\n  return [{ json: { respuesta, crearSheet: false, datosParaSheet: [], tituloSheet: '' } }];\n}\n\n// ========== CASO: Mostrar detalle (query o día específico) ==========\nif (query || diaInicio) {\n  // Determinar título\n  if (diaInicio && diaFin && diaInicio !== diaFin) {\n    tituloSheet = `Pagos_Dia_${diaInicio}_al_${diaFin}`;\n    respuesta = `📅 PAGOS DEL DÍA ${diaInicio} AL ${diaFin}:\\n\\n`;\n  } else if (diaInicio) {\n    tituloSheet = `Pagos_Dia_${diaInicio}`;\n    respuesta = `📅 PAGOS DEL DÍA ${diaInicio}:\\n\\n`;\n  } else if (query && nombresUnicos.length === 1) {\n    tituloSheet = `Contratos_${nombresUnicos[0].replace(/\\s+/g, '_')}`;\n    respuesta = `📋 CONTRATOS DE ${nombresUnicos[0].toUpperCase()}:\\n\\n`;\n  } else {\n    tituloSheet = `Consulta_${Date.now()}`;\n    respuesta = `Encontré ${resultado.length} contrato${resultado.length > 1 ? 's' : ''}:\\n\\n`;\n  }\n  \n  // Si son más de 15, crear Sheet\n  if (resultado.length > 15) {\n    crearSheet = true;\n    datosParaSheet = resultado.map(c => ({\n      Nombre: c.Nombre,\n      Capital: c.Capital,\n      Moneda: c.Moneda,\n      Mensual: c.Mensual,\n      Dia_Pago: c.Dia,\n      Fecha_Vencimiento: c.FechaFinalStr,\n      Estatus: c['Estatus Contrato']\n    }));\n    respuesta += `💵 USD: ${porUSD.length} contratos — Total: $${totalUSD.toFixed(2)}/mes\\n`;\n    respuesta += `🍁 CAD: ${porCAD.length} contratos — Total: $${totalCAD.toFixed(2)}/mes\\n\\n`;\n    respuesta += `📊 Son ${resultado.length} contratos. Generando reporte en Google Sheets...`;\n  } else {\n    if (porUSD.length > 0) {\n      respuesta += `💵 USD (${porUSD.length}):\\n`;\n      porUSD.forEach(c => { respuesta += `• ${c.Nombre}: Capital $${c.Capital}, Rinde $${c.Mensual}/mes, Día ${c.Dia}, Vence ${c.FechaFinalStr}\\n`; });\n      respuesta += `TOTAL USD: $${totalUSD.toFixed(2)}/mes\\n\\n`;\n    }\n    if (porCAD.length > 0) {\n      respuesta += `🍁 CAD (${porCAD.length}):\\n`;\n      porCAD.forEach(c => { respuesta += `• ${c.Nombre}: Capital $${c.Capital}, Rinde $${c.Mensual}/mes, Día ${c.Dia}, Vence ${c.FechaFinalStr}\\n`; });\n      respuesta += `TOTAL CAD: $${totalCAD.toFixed(2)}/mes\\n`;\n    }\n  }\n  \n  return [{ json: { respuesta, crearSheet, datosParaSheet, tituloSheet } }];\n}\n\n// ========== CASO: RESUMEN GENERAL ==========\nconst totalActivos = todosContratos.filter(c => c.ContratoActivo).length;\nconst totalInactivos = todosContratos.filter(c => !c.ContratoActivo).length;\nconst activosUSD = todosContratos.filter(c => c.ContratoActivo && c.Moneda === 'USD');\nconst activosCAD = todosContratos.filter(c => c.ContratoActivo && c.Moneda === 'CAD');\nconst totalGeneralUSD = activosUSD.reduce((sum, c) => sum + c.MensualNum, 0);\nconst totalGeneralCAD = activosCAD.reduce((sum, c) => sum + c.MensualNum, 0);\n\n// Pagos de hoy\nconst pagosHoy = todosContratos.filter(c => c.ContratoActivo && parseInt(c.Dia) === diaHoy);\nconst pagosHoyUSD = pagosHoy.filter(c => c.Moneda === 'USD');\nconst pagosHoyCAD = pagosHoy.filter(c => c.Moneda === 'CAD');\nconst totalHoyUSD = pagosHoyUSD.reduce((sum, c) => sum + c.MensualNum, 0);\nconst totalHoyCAD = pagosHoyCAD.reduce((sum, c) => sum + c.MensualNum, 0);\n\n// Pagos de mañana\nconst pagosManana = todosContratos.filter(c => c.ContratoActivo && parseInt(c.Dia) === diaManana);\nconst pagosManaUSD = pagosManana.filter(c => c.Moneda === 'USD');\nconst pagosManaCAD = pagosManana.filter(c => c.Moneda === 'CAD');\nconst totalManaUSD = pagosManaUSD.reduce((sum, c) => sum + c.MensualNum, 0);\nconst totalManaCAD = pagosManaCAD.reduce((sum, c) => sum + c.MensualNum, 0);\n\nrespuesta = `📊 RESUMEN GENERAL:\\n\\n`;\nrespuesta += `✅ Contratos activos: ${totalActivos}\\n`;\nrespuesta += `   💵 USD: ${activosUSD.length} contratos\\n`;\nrespuesta += `   🍁 CAD: ${activosCAD.length} contratos\\n`;\nrespuesta += `❌ Contratos inactivos: ${totalInactivos}\\n\\n`;\nrespuesta += `💰 RENDIMIENTOS MENSUALES:\\n`;\nrespuesta += `   💵 USD: $${totalGeneralUSD.toFixed(2)}/mes\\n`;\nrespuesta += `   🍁 CAD: $${totalGeneralCAD.toFixed(2)}/mes\\n\\n`;\nrespuesta += `📅 PAGOS HOY (Día ${diaHoy}):\\n`;\nif (pagosHoy.length > 0) {\n  respuesta += `   ${pagosHoy.length} contratos\\n`;\n  if (pagosHoyUSD.length > 0) respuesta += `   💵 USD: $${totalHoyUSD.toFixed(2)} (${pagosHoyUSD.length})\\n`;\n  if (pagosHoyCAD.length > 0) respuesta += `   🍁 CAD: $${totalHoyCAD.toFixed(2)} (${pagosHoyCAD.length})\\n`;\n} else {\n  respuesta += `   No hay pagos hoy\\n`;\n}\nrespuesta += `\\n📆 PAGOS MAÑANA (Día ${diaManana}):\\n`;\nif (pagosManana.length > 0) {\n  respuesta += `   ${pagosManana.length} contratos\\n`;\n  if (pagosManaUSD.length > 0) respuesta += `   💵 USD: $${totalManaUSD.toFixed(2)} (${pagosManaUSD.length})\\n`;\n  if (pagosManaCAD.length > 0) respuesta += `   🍁 CAD: $${totalManaCAD.toFixed(2)} (${pagosManaCAD.length})\\n`;\n} else {\n  respuesta += `   No hay pagos mañana\\n`;\n}\n\nreturn [{ json: { respuesta, crearSheet: false, datosParaSheet: [], tituloSheet: '' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -752,
+        112
+      ],
+      "id": "69877f90-14b2-4f99-99b3-1f690d66ce02",
+      "name": "formatear_respuesta"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "query"
+            },
+            {
+              "name": "dia_inicio"
+            },
+            {
+              "name": "dia_fin"
+            },
+            {
+              "name": "ver_vencimientos"
+            },
+            {
+              "name": "ver_bancarios"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1136,
+        112
+      ],
+      "id": "3aa50934-68d4-4866-ad98-c33090b6d4db",
+      "name": "trigger_herramienta"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "876f23aa-5959-4202-a1f0-094f4f6d9281",
+              "leftValue": "={{ $json.crearSheet }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -544,
+        112
+      ],
+      "id": "ba4a4997-f85e-40c0-9b6b-7f2b9d82ee78",
+      "name": "verificar_si_crear_sheet"
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "title": "={{ $json.tituloSheet }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -336,
+        16
+      ],
+      "id": "5ede346a-527a-4f6c-b094-6d1faa7579ae",
+      "name": "crear_spreadsheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "TpEzLjcUSd2oNr4H",
+          "name": "araceli.mendoza.s@gmail.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('crear_spreadsheet').first().json.spreadsheetUrl }}",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        80,
+        16
+      ],
+      "id": "81798e2e-76e9-4f7e-afd8-4d32cc13d1d3",
+      "name": "insertar_datos",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "TpEzLjcUSd2oNr4H",
+          "name": "araceli.mendoza.s@gmail.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c959d8c5-5abc-4612-b8a1-899a2b79fe7c",
+              "name": "respuesta",
+              "value": "={{ $('formatear_respuesta').item.json.respuesta.replace('Generando reporte en Google Sheets...', '') }}<a href=\"{{ $('crear_spreadsheet').item.json.spreadsheetUrl }}\">📎 Ver reporte en Google Sheets</a>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        624,
+        16
+      ],
+      "id": "ef0dbec7-cba5-4956-a62f-4b450c5d2c9a",
+      "name": "respuesta_con_link"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2d1eea3b-db18-4a7d-80a8-e9c6bfadcfe2",
+              "name": "respuesta",
+              "value": "={{ $json.respuesta }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -336,
+        208
+      ],
+      "id": "e653264e-8da7-4312-ac88-2d8b1a2d405f",
+      "name": "respuesta_normal"
+    },
+    {
+      "parameters": {
+        "jsCode": "const datosParaSheet = $('formatear_respuesta').first().json.datosParaSheet;\n\nreturn datosParaSheet.map(item => ({\n  json: item\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        16
+      ],
+      "id": "75eb7ef3-194e-4b41-9cfe-f6b95fd01eac",
+      "name": "separar_datos"
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        272,
+        16
+      ],
+      "id": "92a2ac0e-c5fb-4241-83fb-8be60ca7583c",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "operation": "share",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('crear_spreadsheet').first().json.spreadsheetUrl }}",
+          "mode": "url"
+        },
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "reader",
+            "type": "anyone"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        448,
+        16
+      ],
+      "id": "80308ef6-680c-4396-baa1-018371ba4718",
+      "name": "Share file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "MsLqR0Nn34fVxMvZ",
+          "name": "araceli.mendoza.s@gmail.com"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "google_sheets_mauri": {
+      "main": [
+        [
+          {
+            "node": "formatear_respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "formatear_respuesta": {
+      "main": [
+        [
+          {
+            "node": "verificar_si_crear_sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "trigger_herramienta": {
+      "main": [
+        [
+          {
+            "node": "google_sheets_mauri",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "verificar_si_crear_sheet": {
+      "main": [
+        [
+          {
+            "node": "crear_spreadsheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respuesta_normal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "crear_spreadsheet": {
+      "main": [
+        [
+          {
+            "node": "separar_datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insertar_datos": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "separar_datos": {
+      "main": [
+        [
+          {
+            "node": "insertar_datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Share file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Share file": {
+      "main": [
+        [
+          {
+            "node": "respuesta_con_link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "dc7085d5-a242-48f4-b78f-0487fe4964b1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "47aceea569c869ebfb36bbe1e1f9be693dac7d1f1806b10383d28b7fbcbcb5e7"
+  },
+  "id": "D4q3BTaQJqIiqPNop5is6",
+  "tags": []
+}
