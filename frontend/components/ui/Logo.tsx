@@ -95,14 +95,14 @@ const textSizes = {
   lg: 'text-4xl',
 } as const;
 
-/** Horizontal logo: icon left, "SAN" (violet) + "ADDS" (white) right. */
+/** Horizontal logo: icon left, "SAN" (violet) + "ADS" (white) right. */
 export function SanaddsLogo({ size = 'md', className = '' }: LogoProps) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       <SanaddsIcon className={iconSizes[size]} />
       <span className={`font-black tracking-tight leading-none ${textSizes[size]}`}>
         <span className="text-violet-300">SAN</span>
-        <span className="text-white">ADDS</span>
+        <span className="text-white">ADS</span>
       </span>
     </div>
   );
@@ -126,7 +126,7 @@ export function SanaddsHero({ className = '' }: { className?: string }) {
       <div className="text-center">
         <div className="text-[3.25rem] font-black tracking-tight leading-none select-none">
           <span className="text-violet-300">SAN</span>
-          <span className="text-white">ADDS</span>
+          <span className="text-white">ADS</span>
         </div>
         <p className="mt-2.5 text-[10px] font-semibold tracking-[0.32em] uppercase text-slate-500">
           AI Social Advertising

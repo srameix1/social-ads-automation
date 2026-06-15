@@ -22,8 +22,23 @@ export async function register(req: Request, res: Response, next: NextFunction):
     }
 
     const result = await authService.register(email, password);
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const token = req.query['token'];
+    if (!token || typeof token !== 'string') {
+      res.status(400).json({ error: 'Token requerido' });
+      return;
+    }
+
+    const result = await authService.verifyEmail(token);
     setAuthCookies(res, result.token, result.user);
-    res.status(201).json({ user: result.user, token: result.token });
+    res.json({ user: result.user, token: result.token });
   } catch (err) {
     next(err);
   }

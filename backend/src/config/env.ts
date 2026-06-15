@@ -33,13 +33,36 @@ export const env = {
   DATABASE_URL: optional('DATABASE_URL', ''),
 
   ANTHROPIC_API_KEY: optional('ANTHROPIC_API_KEY', ''),
+  SERPER_API_KEY:    optional('SERPER_API_KEY',    ''),
 
-  GEMINI_API_KEY: optional('GEMINI_API_KEY', ''),
+  GEMINI_API_KEY:       optional('GEMINI_API_KEY',       ''),
+  OPENAI_API_KEY:       optional('OPENAI_API_KEY',       ''),
+  REPLICATE_API_TOKEN:  optional('REPLICATE_API_TOKEN',  ''),
 
   NANABANANA_API_URL: optional('NANABANANA_API_URL', ''),
   NANABANANA_API_KEY: optional('NANABANANA_API_KEY', ''),
 
+  KIE_API_KEY: optional('KIE_API_KEY', ''),
+
+  RESEND_API_KEY: optional('RESEND_API_KEY', ''),
+
   FRONTEND_URL: optional('FRONTEND_URL', 'http://localhost:3000'),
+  BACKEND_URL:  optional('BACKEND_URL',  'http://localhost:4000'),
   UPLOADS_DIR:  optional('UPLOADS_DIR', './uploads'),
   MAX_FILE_SIZE: parseInt(optional('MAX_FILE_SIZE_MB', '10')) * 1024 * 1024,
+
+  // Meta (Facebook + Instagram) OAuth
+  FACEBOOK_APP_ID:      optional('FACEBOOK_APP_ID', ''),
+  FACEBOOK_APP_SECRET:  optional('FACEBOOK_APP_SECRET', ''),
+
+  // TikTok OAuth
+  TIKTOK_CLIENT_KEY:    optional('TIKTOK_CLIENT_KEY', ''),
+  TIKTOK_CLIENT_SECRET: optional('TIKTOK_CLIENT_SECRET', ''),
+
+  // Stripe
+  STRIPE_SECRET_KEY:         optional('STRIPE_SECRET_KEY', ''),
+  STRIPE_WEBHOOK_SECRET:     optional('STRIPE_WEBHOOK_SECRET', ''),
+  STRIPE_PRICE_BASIC:        optional('STRIPE_PRICE_BASIC', ''),
+  STRIPE_PRICE_PROFESSIONAL: optional('STRIPE_PRICE_PROFESSIONAL', ''),
+  STRIPE_PRICE_PREMIUM:      optional('STRIPE_PRICE_PREMIUM', ''),
 } as const;

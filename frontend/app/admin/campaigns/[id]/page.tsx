@@ -16,7 +16,7 @@ export default function AdminCampaignDetailPage() {
   const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
-    adminApi.getCampaign(id).then(d => setCampaign(d.campaign as Record<string, unknown>)).finally(() => setLoading(false));
+    adminApi.getCampaign(id).then(d => setCampaign(d.campaign as unknown as Record<string, unknown>)).finally(() => setLoading(false));
   }, [id]);
 
   if (loading) return <PageLoader />;

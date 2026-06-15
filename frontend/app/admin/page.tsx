@@ -29,6 +29,30 @@ export default function AdminDashboardPage() {
         <StatsCard title="En proceso"     value={stats?.activeCampaigns ?? 0}   icon="⚡" color="yellow" />
         <StatsCard title="Completadas"    value={stats?.completedCampaigns ?? 0} icon="✅" color="green" />
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <a href="/admin/clients" className="surface rounded-xl p-5 hover:bg-white/[0.04] transition-colors flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-xl">👤</div>
+          <div>
+            <p className="text-sm font-semibold text-slate-200">Clientes</p>
+            <p className="text-xs text-slate-500">Ver todos los clientes</p>
+          </div>
+        </a>
+        <a href="/admin/campaigns" className="surface rounded-xl p-5 hover:bg-white/[0.04] transition-colors flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-xl">📣</div>
+          <div>
+            <p className="text-sm font-semibold text-slate-200">Campañas</p>
+            <p className="text-xs text-slate-500">Ver todas las campañas</p>
+          </div>
+        </a>
+        <a href="/admin/plan-limits" className="surface rounded-xl p-5 hover:bg-white/[0.04] transition-colors flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-xl">⚙️</div>
+          <div>
+            <p className="text-sm font-semibold text-slate-200">Límites de planes</p>
+            <p className="text-xs text-slate-500">Configurar capacidades por plan</p>
+          </div>
+        </a>
+      </div>
     </div>
   );
 }

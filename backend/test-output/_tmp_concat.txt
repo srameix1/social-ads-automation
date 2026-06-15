@@ -1,0 +1,4 @@
+file 'C:/Users/Santiago Rameix/Desktop/LOCAL SECTION claude/social_ads_automation/social-ads-automation/backend/test-output/_tmp_clip0.mp4'
+file 'C:/Users/Santiago Rameix/Desktop/LOCAL SECTION claude/social_ads_automation/social-ads-automation/backend/test-output/_tmp_clip1.mp4'
+file 'C:/Users/Santiago Rameix/Desktop/LOCAL SECTION claude/social_ads_automation/social-ads-automation/backend/test-output/_tmp_clip2.mp4'
+file 'C:/Users/Santiago Rameix/Desktop/LOCAL SECTION claude/social_ads_automation/social-ads-automation/backend/test-output/_tmp_clip3.mp4'

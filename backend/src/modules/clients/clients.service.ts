@@ -143,6 +143,25 @@ export async function updateBrandLogo(userId: string, logoUrl: string): Promise<
   return profile;
 }
 
+export async function getReelUsage(userId: string): Promise<{ used: number; quota: number }> {
+  const [row] = await query<{ used: string; quota: string }>(
+    `SELECT
+       (SELECT COUNT(p.id)
+        FROM posts p
+        JOIN campaigns c ON c.id = p.campaign_id
+        WHERE c.client_id = $1
+          AND p.format = 'reel'
+          AND DATE_TRUNC('month', p.created_at) = DATE_TRUNC('month', NOW())
+       )::int AS used,
+       COALESCE(pl.reel_quota, 8) AS quota
+     FROM client_profiles cp
+     LEFT JOIN plan_limits pl ON pl.plan = cp.plan
+     WHERE cp.user_id = $1`,
+    [userId],
+  );
+  return { used: parseInt(row?.used ?? '0'), quota: parseInt(row?.quota ?? '8') };
+}
+
 export async function getClientById(id: string) {
   const client = await queryOne<ClientProfile & { email: string }>(
     `SELECT u.id, u.email, u.role, u.is_active, u.created_at,

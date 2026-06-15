@@ -3,9 +3,9 @@ import { createError } from '../../middleware/errorHandler';
 
 export async function getStats() {
   const [row] = await query<{
-    total_clients:   string;
-    total_campaigns: string;
-    active_campaigns: string;
+    total_clients:      string;
+    total_campaigns:    string;
+    active_campaigns:   string;
     completed_campaigns: string;
   }>(`
     SELECT
@@ -25,17 +25,17 @@ export async function getStats() {
 export async function getAllClients() {
   return query<{
     id: string; email: string; is_active: boolean; created_at: string;
-    business_name: string; setup_completed: boolean; campaign_count: string;
+    business_name: string; setup_completed: boolean; plan: string; campaign_count: string;
   }>(`
     SELECT u.id, u.email, u.is_active, u.created_at,
-           cp.business_name, cp.setup_completed,
+           cp.business_name, cp.setup_completed, cp.plan,
            COUNT(c.id) AS campaign_count
     FROM users u
     LEFT JOIN client_profiles cp ON cp.user_id = u.id
     LEFT JOIN campaigns c        ON c.client_id = u.id
     WHERE u.role = 'client'
     GROUP BY u.id, u.email, u.is_active, u.created_at,
-             cp.business_name, cp.setup_completed
+             cp.business_name, cp.setup_completed, cp.plan
     ORDER BY u.created_at DESC
   `);
 }
@@ -43,11 +43,11 @@ export async function getAllClients() {
 export async function getClientDetail(id: string) {
   const client = await queryOne<{
     id: string; email: string; is_active: boolean; created_at: string;
-    business_name: string; description: string; setup_completed: boolean;
+    business_name: string; description: string; setup_completed: boolean; plan: string;
     photo_1_url: string; photo_2_url: string; photo_3_url: string;
   }>(`
     SELECT u.id, u.email, u.is_active, u.created_at,
-           cp.business_name, cp.description, cp.setup_completed,
+           cp.business_name, cp.description, cp.setup_completed, cp.plan,
            cp.photo_1_url, cp.photo_2_url, cp.photo_3_url
     FROM users u
     LEFT JOIN client_profiles cp ON cp.user_id = u.id
@@ -56,8 +56,16 @@ export async function getClientDetail(id: string) {
 
   if (!client) throw createError('Cliente no encontrado', 404);
 
-  const campaigns = await query(
-    'SELECT * FROM campaigns WHERE client_id = $1 ORDER BY created_at DESC',
+  const campaigns = await query<{
+    id: string; title: string; status: string; platforms: string[];
+    month_year: string | null; max_posts: number; posts_used: number; created_at: string;
+  }>(
+    `SELECT c.id, c.title, c.status, c.platforms, c.month_year, c.max_posts,
+       (SELECT COUNT(*)::int FROM posts WHERE campaign_id = c.id) AS posts_used,
+       c.created_at
+     FROM campaigns c
+     WHERE c.client_id = $1
+     ORDER BY c.created_at DESC`,
     [id],
   );
 
@@ -93,4 +101,55 @@ export async function getCampaignDetail(id: string) {
   const mediaAssets  = await query('SELECT * FROM media_assets WHERE campaign_id = $1', [id]);
 
   return { ...campaign, strategies, publications, mediaAssets };
+}
+
+// ── Plan limits ─────────────────────────────────────────────────────────────
+
+export interface PlanLimit {
+  id:                     string;
+  plan:                   string;
+  max_posts_per_campaign: number;
+  can_upload_photos:      boolean;
+  can_generate_video:     boolean;
+  can_generate_reel:      boolean;
+  created_at:             string;
+  updated_at:             string;
+}
+
+export async function getPlanLimits(): Promise<PlanLimit[]> {
+  return query<PlanLimit>(
+    'SELECT * FROM plan_limits ORDER BY plan',
+  );
+}
+
+export async function updatePlanLimit(
+  plan: string,
+  data: Partial<Pick<PlanLimit, 'max_posts_per_campaign' | 'can_upload_photos' | 'can_generate_video' | 'can_generate_reel'>>,
+): Promise<PlanLimit> {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  let i = 1;
+
+  if (data.max_posts_per_campaign !== undefined) { fields.push(`max_posts_per_campaign = $${i++}`); values.push(data.max_posts_per_campaign); }
+  if (data.can_upload_photos      !== undefined) { fields.push(`can_upload_photos = $${i++}`);      values.push(data.can_upload_photos); }
+  if (data.can_generate_video     !== undefined) { fields.push(`can_generate_video = $${i++}`);     values.push(data.can_generate_video); }
+  if (data.can_generate_reel      !== undefined) { fields.push(`can_generate_reel = $${i++}`);      values.push(data.can_generate_reel); }
+
+  if (!fields.length) throw createError('Nada que actualizar', 400);
+
+  values.push(plan);
+  const [updated] = await query<PlanLimit>(
+    `UPDATE plan_limits SET ${fields.join(', ')} WHERE plan = $${i} RETURNING *`,
+    values,
+  );
+  if (!updated) throw createError(`Plan '${plan}' no encontrado`, 404);
+  return updated;
+}
+
+export async function updateCampaignMaxPosts(campaignId: string, maxPosts: number): Promise<void> {
+  const result = await query<{ id: string }>(
+    'UPDATE campaigns SET max_posts = $1 WHERE id = $2 RETURNING id',
+    [maxPosts, campaignId],
+  );
+  if (!result.length) throw createError('Campaña no encontrada', 404);
 }

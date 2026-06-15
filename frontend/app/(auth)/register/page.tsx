@@ -2,9 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/api';
-import { saveAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
@@ -12,28 +10,57 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { SanaddsLogo } from '@/components/ui/Logo';
 
 export default function RegisterPage() {
-  const router = useRouter();
   const { t } = useLanguage();
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [confirm,  setConfirm]  = useState('');
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
+  const [sent,     setSent]     = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password !== confirm) { setError(t('register_err_mismatch')); return; }
-    if (password.length < 8)  { setError(t('register_err_short'));    return; }
+    if (password !== confirm) { setError(t('register_err_mismatch') as string); return; }
+    if (password.length < 8)  { setError(t('register_err_short') as string);    return; }
     setLoading(true); setError('');
     try {
-      const data = await auth.register(email, password);
-      saveAuth(data.token, data.user);
-      router.push('/profile/setup');
+      await auth.register(email, password);
+      setSent(true);
     } catch (err) {
       setError((err as Error).message);
       setLoading(false);
     }
   };
+
+  if (sent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'var(--bg)' }}>
+        <div className="w-full max-w-sm animate-slide-up text-center">
+          <div className="flex justify-center mb-10">
+            <SanaddsLogo size="md" />
+          </div>
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-8">
+            <div className="flex justify-center mb-4">
+              <div className="w-14 h-14 rounded-full bg-brand-500/10 border border-brand-500/30 flex items-center justify-center">
+                <svg className="w-7 h-7 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                </svg>
+              </div>
+            </div>
+            <h1 className="text-xl font-bold text-white mb-2">{t('register_check_email_title')}</h1>
+            <p className="text-slate-400 text-sm leading-relaxed">{t('register_check_email_sub')}</p>
+            <p className="text-slate-600 text-xs mt-4">{email}</p>
+          </div>
+          <p className="text-center text-sm text-slate-500 mt-6">
+            {t('register_has_account')}{' '}
+            <Link href="/login" className="text-brand-400 hover:text-brand-300 font-medium transition-colors">
+              {t('register_login')}
+            </Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'var(--bg)' }}>
@@ -50,7 +77,7 @@ export default function RegisterPage() {
 
         <form onSubmit={submit} className="space-y-4">
           <Input
-            label={t('login_email')}
+            label={t('login_email') as string}
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
@@ -59,19 +86,19 @@ export default function RegisterPage() {
             autoFocus
           />
           <Input
-            label={t('login_password')}
+            label={t('login_password') as string}
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            placeholder={t('register_password_placeholder')}
+            placeholder={t('register_password_placeholder') as string}
             required
           />
           <Input
-            label={t('register_confirm')}
+            label={t('register_confirm') as string}
             type="password"
             value={confirm}
             onChange={e => setConfirm(e.target.value)}
-            placeholder={t('register_confirm_placeholder')}
+            placeholder={t('register_confirm_placeholder') as string}
             required
           />
 

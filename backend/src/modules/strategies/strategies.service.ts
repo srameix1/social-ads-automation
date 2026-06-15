@@ -1,277 +1,234 @@
 import fs   from 'fs';
 import path from 'path';
-import { query, queryOne, withTransaction } from '../../config/database';
-import { createError } from '../../middleware/errorHandler';
-import { generateMediaVariations } from '../../services/nanabanana.service';
-import { publishToInstagram } from '../../services/instagram.service';
-import { publishToTikTok }    from '../../services/tiktok.service';
-import { publishToFacebook }  from '../../services/facebook.service';
-import { getDecryptedCredentials } from '../credentials/credentials.service';
+import { query, queryOne } from '../../config/database';
+import {
+  generateVisualVariations,
+  generateVisualVariationsFromPhotos,
+  generateProfessionalVideosFromImage,
+  generatePremiumReelFromImage,
+  ContentInput,
+} from '../../services/contentGeneration.service';
 import { logger } from '../../utils/logger';
 import { env }    from '../../config/env';
-import { PoolClient } from 'pg';
+
+interface Post {
+  id:             string;
+  campaign_id:    string;
+  format:         'image' | 'animated_video' | 'reel';
+  problem:        string | null;
+  differentiator: string | null;
+}
 
 interface Strategy {
   id:             string;
-  campaign_id:    string;
-  title:          string;
   copy_text:      string;
   visual_concept: string;
 }
 
-interface Campaign {
-  id:              string;
-  client_id:       string;
-  platforms:       string[];
-  status:          string;
-  title:           string;
+interface ClientProfile {
+  plan:                  string | null;
+  business_name:         string | null;
+  brand_primary_color:   string | null;
+  brand_secondary_color: string | null;
+  brand_logo_url:        string | null;
 }
 
-export async function retryPublishing(
-  campaignId: string,
-  clientId:   string,
+export async function generateVisualsForPost(
+  post:          Post,
+  strategy:      Strategy,
+  clientId:      string,
+  photoBuffers?: Buffer[],
 ): Promise<void> {
-  const campaign = await queryOne<Campaign>(
-    "SELECT * FROM campaigns WHERE id = $1 AND client_id = $2 AND status = 'failed'",
-    [campaignId, clientId],
-  );
-  if (!campaign) throw createError('Campaña no encontrada o no está en estado fallido', 404);
-
-  const strategy = await queryOne<Strategy>(
-    'SELECT * FROM strategies WHERE campaign_id = $1 AND selected = TRUE',
-    [campaignId],
-  );
-  if (!strategy) throw createError('No hay estrategia seleccionada para reintentar', 400);
-
-  // Reset state for a clean retry
-  await query("UPDATE campaigns SET status = 'creating_media', error_message = NULL WHERE id = $1", [campaignId]);
-  await query("DELETE FROM publications WHERE campaign_id = $1", [campaignId]);
-  await query(
-    `UPDATE media_assets SET status = 'generating', url = NULL, nanabanana_job_id = NULL
-     WHERE campaign_id = $1 AND strategy_id = $2`,
-    [campaignId, strategy.id],
-  );
-
-  setImmediate(() => processMediaAndPublish(campaign, strategy, clientId));
-}
-
-export async function selectStrategy(
-  campaignId: string,
-  strategyId: string,
-  clientId:   string,
-): Promise<void> {
-  // Run DB updates inside a transaction
-  await withTransaction(async (dbClient: PoolClient) => {
-    const campaign = await dbClient.query<Campaign>(
-      "SELECT * FROM campaigns WHERE id = $1 AND client_id = $2 AND status = 'pending_selection'",
-      [campaignId, clientId],
-    ).then(r => r.rows[0]);
-
-    if (!campaign) {
-      throw createError('Campaña no encontrada o no está en estado de selección', 404);
-    }
-
-    const strategy = await dbClient.query<Strategy>(
-      'SELECT * FROM strategies WHERE id = $1 AND campaign_id = $2',
-      [strategyId, campaignId],
-    ).then(r => r.rows[0]);
-
-    if (!strategy) throw createError('Estrategia no encontrada', 404);
-
-    await dbClient.query('UPDATE strategies SET selected = TRUE WHERE id = $1', [strategyId]);
-    await dbClient.query(
-      "UPDATE campaigns SET status = 'creating_media' WHERE id = $1",
-      [campaignId],
-    );
-
-    // One media_asset per platform (existing schema)
-    for (const platform of campaign.platforms) {
-      await dbClient.query(
-        `INSERT INTO media_assets (campaign_id, strategy_id, type, status, platform, prompt_used)
-         VALUES ($1, $2, $3, 'generating', $4, $5)`,
-        [
-          campaignId, strategyId,
-          platform === 'tiktok' ? 'video' : 'image',
-          platform,
-          strategy.visual_concept,
-        ],
-      );
-    }
-  });
-
-  // Kick off media generation + publishing asynchronously after the transaction commits
-  const strategy = await queryOne<Strategy>('SELECT * FROM strategies WHERE id = $1', [strategyId]);
-  const campaign = await queryOne<Campaign>('SELECT * FROM campaigns WHERE id = $1', [campaignId]);
-  if (strategy && campaign) {
-    setImmediate(() => processMediaAndPublish(campaign, strategy, clientId));
-  }
-}
-
-async function processMediaAndPublish(
-  campaign: Campaign,
-  strategy: Strategy,
-  clientId: string,
-): Promise<void> {
+  logger.info(`[Strategy] Generando visuales para post ${post.id} — format: ${post.format}`);
   try {
-    const mediaAssets = await query<{ id: string; platform: string; type: 'image' | 'video' }>(
-      'SELECT id, platform, type FROM media_assets WHERE campaign_id = $1 AND strategy_id = $2',
-      [campaign.id, strategy.id],
+    const clientProfile = await loadClientProfile(clientId);
+    const logoBuffer    = clientProfile.brand_logo_url
+      ? await loadLogoAsBuffer(clientProfile.brand_logo_url)
+      : undefined;
+
+    const contentInput: ContentInput = {
+      businessName:   clientProfile.business_name ?? 'Negocio',
+      description:    [post.problem, post.differentiator].filter(Boolean).join(' ') || undefined,
+      visualConcept:  strategy.visual_concept,
+      copyText:       strategy.copy_text,
+      primaryColor:   clientProfile.brand_primary_color   ?? '#1A1A1A',
+      secondaryColor: clientProfile.brand_secondary_color ?? undefined,
+      logoBuffer,
+      clientPhotos:   [],
+      outputDir:      '',
+      campaignId:     post.id,
+    };
+
+    const variationsDir = path.resolve(env.UPLOADS_DIR, 'variations', post.id);
+    const plan          = clientProfile.plan ?? 'basic';
+
+    const variations = photoBuffers?.length
+      ? await generateVisualVariationsFromPhotos(photoBuffers, contentInput, variationsDir, plan)
+      : await generateVisualVariations(contentInput, variationsDir);
+
+    const rows = await query<{ id: string; position: number }>(
+      'SELECT id, position FROM visual_variations WHERE post_id = $1 ORDER BY position',
+      [post.id],
     );
 
-    await query("UPDATE campaigns SET status = 'publishing' WHERE id = $1", [campaign.id]);
-
-    // Generate all 3 format variations once — Gemini is called here
-    const clientPhotos = await loadClientPhotosAsBase64(clientId);
-    const variations = await generateMediaVariations({
-      prompt:        strategy.visual_concept,
-      businessName:  campaign.title,
-      copyText:      strategy.copy_text,
-      strategyTitle: strategy.title,
-      clientPhotos,
-      campaignId:    campaign.id,
-      strategyId:    strategy.id,
-    });
-
-    logger.info(`[Strategy] Variaciones generadas — jobId: ${variations.jobId}`);
-
-    let allSuccess = true;
-    let firstAssetError: string | null = null;
-
-    for (const asset of mediaAssets) {
-      try {
-        // Pick the variation that best fits each platform
-        const mediaUrl = pickVariationForPlatform(variations, asset.platform);
-
-        await query(
-          "UPDATE media_assets SET status = 'ready', url = $1, nanabanana_job_id = $2 WHERE id = $3",
-          [mediaUrl, variations.jobId, asset.id],
-        );
-
-        await publishToSocialMedia(
-          asset.platform,
-          clientId,
-          mediaUrl,
-          strategy.copy_text,
-          campaign.id,
-          strategy.id,
-          asset.id,
-        );
-      } catch (err) {
-        logger.error(`[Strategy] Error en plataforma ${asset.platform}:`, err);
-        await query("UPDATE media_assets SET status = 'failed' WHERE id = $1", [asset.id]);
-        await query(
-          `INSERT INTO publications
-             (campaign_id, strategy_id, media_asset_id, platform, status, error_message)
-           VALUES ($1, $2, $3, $4, 'failed', $5)`,
-          [campaign.id, strategy.id, asset.id, asset.platform, (err as Error).message],
-        );
-        if (!firstAssetError) firstAssetError = (err as Error).message;
-        allSuccess = false;
-      }
-    }
-
-    if (allSuccess) {
-      await query("UPDATE campaigns SET status = 'completed' WHERE id = $1", [campaign.id]);
-    } else {
+    for (const row of rows) {
+      const v = variations[row.position - 1];
+      if (!v) continue;
+      const url = filePathToUrl(v.path);
       await query(
-        "UPDATE campaigns SET status = 'failed', error_message = $1 WHERE id = $2",
-        [firstAssetError, campaign.id],
+        `UPDATE visual_variations
+            SET url = $1, status = 'ready', visual_concept_variant = $2, type = $3
+          WHERE id = $4`,
+        [url, v.visualConceptVariant, v.type, row.id],
       );
     }
-  } catch (err) {
-    logger.error('[Strategy] Error procesando media y publicación:', err);
+
     await query(
-      "UPDATE campaigns SET status = 'failed', error_message = $1 WHERE id = $2",
-      [(err as Error).message, campaign.id],
+      "UPDATE posts SET workflow_status = 'visuals_ready' WHERE id = $1",
+      [post.id],
+    );
+    logger.info(`[Strategy] Visuales listos — post ${post.id}`);
+
+  } catch (err) {
+    logger.error('[Strategy] Error generando visuales:', err);
+    await query(
+      "UPDATE posts SET workflow_status = 'visuals_failed' WHERE id = $1",
+      [post.id],
+    );
+    await query(
+      "UPDATE visual_variations SET status = 'failed' WHERE post_id = $1",
+      [post.id],
     );
   }
 }
 
-async function publishToSocialMedia(
-  platform:     string,
-  clientId:     string,
-  mediaUrl:     string,
-  caption:      string,
-  campaignId:   string,
-  strategyId:   string,
-  mediaAssetId: string,
+export async function generateVideoForSelectedVariation(
+  postId:      string,
+  variationId: string,
+  imageUrl:    string,
+  format:      'animated_video' | 'reel',
+  outputDir:   string,
 ): Promise<void> {
-  let postId  = '';
-  let postUrl = '';
-
+  logger.info(`[Strategy] Generando video ${format} desde variación ${variationId}`);
   try {
-    const creds = await getDecryptedCredentials(clientId, platform as 'instagram' | 'tiktok' | 'facebook');
+    const match = imageUrl.match(/\/uploads\/(.+)$/);
+    if (!match) throw new Error(`URL de imagen inválida: ${imageUrl}`);
+    const imagePath = path.join(path.resolve(env.UPLOADS_DIR), match[1]);
+    if (!fs.existsSync(imagePath)) throw new Error(`Imagen no encontrada: ${imagePath}`);
 
-    if (platform === 'instagram') {
-      const r = await publishToInstagram(creds as Parameters<typeof publishToInstagram>[0], mediaUrl, caption);
-      postId = r.postId; postUrl = r.postUrl;
-    } else if (platform === 'tiktok') {
-      const r = await publishToTikTok(creds as Parameters<typeof publishToTikTok>[0], mediaUrl, caption);
-      postId = r.postId; postUrl = r.postUrl;
-    } else if (platform === 'facebook') {
-      const r = await publishToFacebook(creds as Parameters<typeof publishToFacebook>[0], mediaUrl, caption);
-      postId = r.postId; postUrl = r.postUrl;
+    let videoUrl: string;
+    if (format === 'animated_video') {
+      const contentInput = await buildContentInputForPost(postId);
+      const { feed } = await generateProfessionalVideosFromImage(imagePath, outputDir, contentInput ?? undefined);
+      videoUrl = filePathToUrl(feed);
+    } else {
+      const contentInput = await buildContentInputForPost(postId);
+      const { reel } = await generatePremiumReelFromImage(imagePath, outputDir, contentInput ?? undefined);
+      videoUrl = filePathToUrl(reel);
     }
 
     await query(
-      `INSERT INTO publications
-         (campaign_id, strategy_id, media_asset_id, platform, status, post_id, post_url, published_at)
-       VALUES ($1, $2, $3, $4, 'published', $5, $6, NOW())`,
-      [campaignId, strategyId, mediaAssetId, platform, postId, postUrl],
+      `UPDATE visual_variations SET url = $1, type = 'video' WHERE id = $2`,
+      [videoUrl, variationId],
     );
-  } catch (err) {
     await query(
-      `INSERT INTO publications
-         (campaign_id, strategy_id, media_asset_id, platform, status, error_message)
-       VALUES ($1, $2, $3, $4, 'failed', $5)`,
-      [campaignId, strategyId, mediaAssetId, platform, (err as Error).message],
+      "UPDATE posts SET workflow_status = 'visual_selected' WHERE id = $1",
+      [postId],
     );
-    throw err;
+    logger.info(`[Strategy] Video ${format} listo — variación ${variationId}`);
+  } catch (err) {
+    logger.error('[Strategy] Error generando video:', err);
+    await query(
+      "UPDATE posts SET workflow_status = 'visual_selected' WHERE id = $1",
+      [postId],
+    );
   }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function pickVariationForPlatform(
-  v:        { square: string; vertical: string; horizontal: string },
-  platform: string,
-): string {
-  if (platform === 'tiktok')   return v.vertical;
-  if (platform === 'facebook') return v.horizontal;
-  return v.square; // instagram and default
-}
-
-async function loadClientPhotosAsBase64(clientId: string): Promise<string[]> {
-  const profile = await queryOne<{
-    photo_1_url: string | null;
-    photo_2_url: string | null;
-    photo_3_url: string | null;
+async function buildContentInputForPost(postId: string): Promise<ContentInput | null> {
+  const row = await queryOne<{
+    problem:                   string | null;
+    differentiator:            string | null;
+    post_focus:                string | null;
+    campaign_id:               string;
+    copy_text:                 string | null;
+    visual_concept:            string | null;
+    business_name:             string | null;
+    campaign_business_problem: string | null;
+    campaign_differentiator:   string | null;
+    primary_color:             string | null;
+    secondary_color:           string | null;
+    brand_logo_url:            string | null;
   }>(
-    'SELECT photo_1_url, photo_2_url, photo_3_url FROM client_profiles WHERE user_id = $1',
-    [clientId],
+    `SELECT p.problem, p.differentiator, p.post_focus, p.campaign_id,
+            s.copy_text, s.visual_concept,
+            cp.business_name,
+            c.business_problem AS campaign_business_problem,
+            c.differentiator   AS campaign_differentiator,
+            cp.brand_primary_color   AS primary_color,
+            cp.brand_secondary_color AS secondary_color,
+            cp.brand_logo_url
+     FROM posts p
+     LEFT JOIN strategies s ON s.id = p.strategy_id
+     JOIN campaigns c ON c.id = p.campaign_id
+     JOIN client_profiles cp ON cp.user_id = c.client_id
+     WHERE p.id = $1`,
+    [postId],
   );
 
-  if (!profile) return [];
+  if (!row) return null;
 
-  const urls = [profile.photo_1_url, profile.photo_2_url, profile.photo_3_url]
-    .filter((u): u is string => !!u);
+  const logoBuffer = row.brand_logo_url
+    ? await loadLogoAsBuffer(row.brand_logo_url)
+    : undefined;
 
-  const photos: string[] = [];
+  // Prefer campaign-level business context over the old per-post fields
+  const descParts = [
+    row.campaign_business_problem ?? row.problem,
+    row.campaign_differentiator   ?? row.differentiator,
+  ].filter(Boolean);
 
-  for (const url of urls) {
-    try {
-      // Strip the host prefix to get the relative path inside UPLOADS_DIR
-      const match = url.match(/\/uploads\/(.+)$/);
-      if (!match) continue;
+  return {
+    businessName:   row.business_name  ?? 'Negocio',
+    description:    descParts.join(' ') || undefined,
+    postFocus:      row.post_focus      ?? undefined,
+    visualConcept:  row.visual_concept  ?? undefined,
+    copyText:       row.copy_text       ?? '',
+    primaryColor:   row.primary_color   ?? '#1A1A1A',
+    secondaryColor: row.secondary_color ?? undefined,
+    logoBuffer,
+    clientPhotos:   [],
+    outputDir:      '',
+    campaignId:     row.campaign_id,
+  };
+}
 
-      const filePath = path.join(path.resolve(env.UPLOADS_DIR), match[1]);
-      if (!fs.existsSync(filePath)) continue;
+async function loadClientProfile(clientId: string): Promise<ClientProfile> {
+  return await queryOne<ClientProfile>(
+    `SELECT plan, business_name,
+            brand_primary_color, brand_secondary_color, brand_logo_url
+     FROM client_profiles WHERE user_id = $1`,
+    [clientId],
+  ) ?? {
+    plan: null, business_name: null,
+    brand_primary_color: null, brand_secondary_color: null, brand_logo_url: null,
+  };
+}
 
-      photos.push(fs.readFileSync(filePath).toString('base64'));
-    } catch (err) {
-      logger.warn('[Strategy] No se pudo cargar foto del cliente:', (err as Error).message);
-    }
+async function loadLogoAsBuffer(logoUrl: string): Promise<Buffer | undefined> {
+  try {
+    const match = logoUrl.match(/\/uploads\/(.+)$/);
+    if (!match) return undefined;
+    const filePath = path.join(path.resolve(env.UPLOADS_DIR), match[1]);
+    if (!fs.existsSync(filePath)) return undefined;
+    return fs.readFileSync(filePath);
+  } catch (err) {
+    logger.warn('[Strategy] No se pudo cargar logo:', (err as Error).message);
+    return undefined;
   }
+}
 
-  return photos;
+function filePathToUrl(absolutePath: string): string {
+  const relative = path.relative(path.resolve(env.UPLOADS_DIR), absolutePath).replace(/\\/g, '/');
+  return `/uploads/${relative}`;
 }

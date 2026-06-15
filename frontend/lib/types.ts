@@ -21,22 +21,22 @@ export const PLAN_DETAILS: Record<ServicePlan, {
     ],
   },
   professional: {
-    name: 'Profesional', price: 197, posts: 20,
+    name: 'Profesional', price: 197, posts: 24,
     platforms: ['instagram', 'facebook', 'tiktok'],
     features: [
-      '20 posts al mes',
+      '24 posts al mes',
       'Logo de tu negocio en cada imagen',
       'Colores y tipografía de tu marca',
       'Publicación en Instagram, Facebook y TikTok',
     ],
   },
   premium: {
-    name: 'Premium', price: 397, posts: 20,
+    name: 'Premium', price: 397, posts: 30,
     platforms: ['instagram', 'facebook', 'tiktok'],
     features: [
-      '20 posts al mes (igual que Profesional)',
-      '12 videos cortos al mes con IA (Reels y Stories)',
-      'Videos de 6-8 segundos generados con Veo 2',
+      '30 posts al mes',
+      '8 videos cortos Veo 2 incluidos',
+      'Videos de 6-8 segundos generados con IA',
       'Publicación en Instagram, Facebook y TikTok',
     ],
   },
@@ -66,31 +66,42 @@ export interface CredentialStatus {
   updated_at: string | null;
 }
 
-export type CampaignStatus =
-  | 'draft'
-  | 'generating'
-  | 'pending_selection'
-  | 'creating_media'
-  | 'publishing'
-  | 'completed'
-  | 'failed';
+export type PostStatus = 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed';
+export type PostFormat = 'image' | 'animated_video' | 'reel';
+export type WorkflowStatus =
+  | 'draft' | 'described' | 'generating_copy' | 'copy_ready'
+  | 'generating_visuals' | 'visuals_ready' | 'visuals_failed'
+  | 'visual_selected' | 'generating_video' | 'confirmed';
 
-export interface Campaign {
-  id:              string;
-  client_id:       string;
-  title:           string;
-  objective:       string | null;
-  target_audience: string | null;
-  platforms:       string[];
-  status:          CampaignStatus;
-  error_message:   string | null;
-  created_at:      string;
-  updated_at:      string;
+export interface Post {
+  id:                  string;
+  campaign_id:         string;
+  strategy_id:         string | null;
+  visual_variation_id: string | null;
+  scheduled_date:      string | null;
+  status:              PostStatus;
+  platforms:           string[];
+  platform:            string;
+  format:              PostFormat;
+  post_focus:          string | null;
+  problem:             string | null;
+  differentiator:      string | null;
+  ideal_client:        string | null;
+  concrete_result:     string | null;
+  client_pain:         string | null;
+  workflow_status:     WorkflowStatus;
+  overlay_logo:        boolean;
+  overlay_copy:        boolean;
+  selected_visual_url: string | null;
+  published_at:        string | null;
+  error_message:       string | null;
+  created_at:          string;
+  updated_at:          string;
 }
 
 export interface Strategy {
   id:             string;
-  campaign_id:    string;
+  post_id:        string;
   title:          string;
   description:    string;
   copy_text:      string;
@@ -102,16 +113,60 @@ export interface Strategy {
   created_at:     string;
 }
 
-export interface MediaAsset {
-  id:          string;
-  campaign_id: string;
-  strategy_id: string;
-  type:        'image' | 'video';
-  status:      'pending' | 'generating' | 'ready' | 'failed';
-  platform:    string;
-  url:         string | null;
-  created_at:  string;
+export interface VisualVariation {
+  id:                    string;
+  post_id:               string;
+  strategy_id:           string | null;
+  position:              1 | 2 | 3 | 4;
+  url:                   string | null;
+  type:                  'image' | 'video';
+  status:                'generating' | 'ready' | 'failed';
+  visual_concept_variant: string | null;
+  selected:              boolean;
 }
+
+export interface PostWithDetails extends Post {
+  strategies: Strategy[];
+  variations: VisualVariation[];
+}
+
+export interface PlanLimits {
+  id:                     string;
+  plan:                   ServicePlan;
+  max_posts_per_campaign: number;
+  can_upload_photos:      boolean;
+  can_generate_video:     boolean;
+  can_generate_reel:      boolean;
+  reel_quota:             number;
+  created_at:             string;
+  updated_at:             string;
+}
+
+export interface Campaign {
+  id:               string;
+  client_id:        string;
+  title:            string;
+  platforms:        string[];
+  month_year:       string | null;
+  start_date:       string | null;
+  end_date:         string | null;
+  max_posts:        number;
+  posts_used:       number;
+  business_problem: string | null;
+  differentiator:   string | null;
+  ideal_client:     string | null;
+  concrete_result:  string | null;
+  client_pain:      string | null;
+  created_at:       string;
+  updated_at:       string;
+}
+
+export interface CampaignWithPosts extends Campaign {
+  posts: Post[];
+}
+
+// Backward-compat alias used by hooks and admin pages
+export type CampaignWithDetail = CampaignWithPosts;
 
 export interface Publication {
   id:             string;
@@ -127,7 +182,9 @@ export interface Publication {
   created_at:     string;
 }
 
-export interface CampaignWithDetail extends Campaign {
-  strategies:   Strategy[];
-  publications: Publication[];
+export interface SubscriptionStatus {
+  plan:             ServicePlan;
+  status:           'inactive' | 'active' | 'past_due' | 'cancelled';
+  subscriptionId:   string | null;
+  currentPeriodEnd: string | null;
 }

@@ -29,7 +29,7 @@ export async function uploadBrandLogo(req: Request, res: Response, next: NextFun
   try {
     const file = req.file;
     if (!file) { res.status(400).json({ error: 'Archivo de logo requerido' }); return; }
-    const url     = getPublicUrl(req, file.filename);
+    const url     = getPublicUrl(req, `logos/${file.filename}`);
     const profile = await clientsService.updateBrandLogo(req.user!.userId, url);
     res.json({ profile });
   } catch (err) { next(err); }
@@ -49,6 +49,13 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
 
     const profile = await clientsService.updateProfile(req.user!.userId, business_name, description ?? '');
     res.json({ profile });
+  } catch (err) { next(err); }
+}
+
+export async function getReelUsage(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const usage = await clientsService.getReelUsage(req.user!.userId);
+    res.json(usage);
   } catch (err) { next(err); }
 }
 

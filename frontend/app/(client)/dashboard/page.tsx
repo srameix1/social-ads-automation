@@ -2,24 +2,25 @@
 
 import Link from 'next/link';
 import { useCampaigns } from '@/hooks/useCampaigns';
-import { campaignStatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { PageLoader } from '@/components/ui/Spinner';
-import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { LOCALE_MAP } from '@/lib/i18n';
+
+const PLATFORM_ICONS: Record<string, string> = {
+  instagram: '📸', tiktok: '🎵', facebook: '👥',
+};
 
 export default function DashboardPage() {
   const { campaigns, loading } = useCampaigns();
-  const { user } = useAuth();
   const { t, lang } = useLanguage();
 
   if (loading) return <PageLoader />;
 
-  const active    = campaigns.filter(c => !['completed', 'failed'].includes(c.status));
-  const completed = campaigns.filter(c => c.status === 'completed');
-  const pending   = campaigns.filter(c => c.status === 'pending_selection');
+  const dateLocale = LOCALE_MAP[lang];
 
-  const dateLocale = lang === 'es' ? 'es-MX' : 'en-US';
+  // Count campaigns with in-progress posts
+  const withActiveAds = campaigns.filter(c => (c.posts_used ?? 0) > 0);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -36,29 +37,16 @@ export default function DashboardPage() {
           <p className="text-xs text-slate-500 mt-1.5 uppercase tracking-wider">{t('dash_total')}</p>
         </div>
         <div className="surface rounded-xl p-5 border-amber-500/20">
-          <p className="text-3xl font-bold text-amber-400">{active.length}</p>
-          <p className="text-xs text-slate-500 mt-1.5 uppercase tracking-wider">{t('dash_in_progress')}</p>
+          <p className="text-3xl font-bold text-amber-400">
+            {campaigns.reduce((sum, c) => sum + (c.posts_used ?? 0), 0)}
+          </p>
+          <p className="text-xs text-slate-500 mt-1.5 uppercase tracking-wider">{t('dash_ads_created')}</p>
         </div>
         <div className="surface rounded-xl p-5 border-emerald-500/20">
-          <p className="text-3xl font-bold text-emerald-400">{completed.length}</p>
-          <p className="text-xs text-slate-500 mt-1.5 uppercase tracking-wider">{t('dash_completed')}</p>
+          <p className="text-3xl font-bold text-emerald-400">{withActiveAds.length}</p>
+          <p className="text-xs text-slate-500 mt-1.5 uppercase tracking-wider">{t('dash_active_campaigns')}</p>
         </div>
       </div>
-
-      {/* Action needed */}
-      {pending.length > 0 && (
-        <div className="rounded-xl p-5 border border-amber-500/20 bg-amber-500/5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-amber-300">{t('dash_action_required')}</p>
-              <p className="text-xs text-slate-500 mt-0.5">{t('dash_action_sub', pending.length)}</p>
-            </div>
-            <Link href={`/campaigns/${pending[0].id}`}>
-              <Button variant="outline" size="sm">{t('dash_action_btn')}</Button>
-            </Link>
-          </div>
-        </div>
-      )}
 
       {/* Campaigns list */}
       <div>
@@ -100,14 +88,21 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-200">{c.title}</p>
-                    <p className="text-xs text-slate-600 mt-0.5">
-                      {new Date(c.created_at).toLocaleDateString(dateLocale, { day: 'numeric', month: 'short', year: 'numeric' })}
-                      {' · '}{c.platforms.join(', ')}
-                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-slate-600">
+                        {new Date(c.created_at).toLocaleDateString(dateLocale, { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                      <span className="text-slate-700">·</span>
+                      <div className="flex gap-1">
+                        {c.platforms.map(p => (
+                          <span key={p} title={p} className="text-xs">{PLATFORM_ICONS[p] ?? p}</span>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  {campaignStatusBadge(c.status)}
+                  <span className="text-xs text-slate-500">{t('dash_ads_count', c.posts_used ?? 0, c.max_posts)}</span>
                   <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
                   </svg>

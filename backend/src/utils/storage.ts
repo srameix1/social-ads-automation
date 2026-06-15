@@ -13,6 +13,12 @@ export function getUploadsDir(): string {
   return dir;
 }
 
+export function getLogosDir(): string {
+  const dir = path.join(getUploadsDir(), 'logos');
+  ensureDir(dir);
+  return dir;
+}
+
 export function getFilePath(filename: string): string {
   return path.join(getUploadsDir(), filename);
 }

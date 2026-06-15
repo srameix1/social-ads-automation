@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { campaigns as campaignsApi } from '@/lib/api';
-import type { Campaign, CampaignWithDetail } from '@/lib/types';
+import type { Campaign, CampaignWithPosts } from '@/lib/types';
 
 export function useCampaigns() {
   const [items, setItems]     = useState<Campaign[]>([]);
@@ -28,7 +28,7 @@ export function useCampaigns() {
 }
 
 export function useCampaign(id: string) {
-  const [campaign, setCampaign] = useState<CampaignWithDetail | null>(null);
+  const [campaign, setCampaign] = useState<CampaignWithPosts | null>(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
 

@@ -1,148 +1,122 @@
-import { query, queryOne, withTransaction, pool } from '../../config/database';
+import { query, queryOne } from '../../config/database';
 import { createError } from '../../middleware/errorHandler';
-import { generateAdStrategies } from '../../services/claude.service';
-import { logger } from '../../utils/logger';
-import { PoolClient } from 'pg';
 
 export interface Campaign {
-  id:              string;
-  client_id:       string;
-  title:           string;
-  objective:       string | null;
-  target_audience: string | null;
-  platforms:       string[];
-  status:          string;
-  error_message:   string | null;
-  created_at:      string;
-  updated_at:      string;
+  id:               string;
+  client_id:        string;
+  title:            string;
+  platforms:        string[];
+  month_year:       string | null;
+  start_date:       string | null;
+  end_date:         string | null;
+  max_posts:        number;
+  posts_used:       number;
+  business_problem: string | null;
+  differentiator:   string | null;
+  ideal_client:     string | null;
+  concrete_result:  string | null;
+  client_pain:      string | null;
+  created_at:       string;
+  updated_at:       string;
 }
 
-export interface CampaignWithStrategies extends Campaign {
-  strategies: Strategy[];
-  publications: Publication[];
+export interface PostSummary {
+  id:                  string;
+  campaign_id:         string;
+  scheduled_date:      string | null;
+  status:              string;
+  platforms:           string[];
+  format:              string;
+  workflow_status:     string;
+  selected_visual_url: string | null;
+  created_at:          string;
+  updated_at:          string;
 }
 
-interface Strategy {
-  id:             string;
-  title:          string;
-  description:    string;
-  copy_text:      string;
-  visual_concept: string;
-  tone:           string | null;
-  target_hook:    string | null;
-  position:       number;
-  selected:       boolean;
-}
-
-interface Publication {
-  id:           string;
-  platform:     string;
-  status:       string;
-  post_url:     string | null;
-  published_at: string | null;
+export interface CampaignWithPosts extends Campaign {
+  posts: PostSummary[];
 }
 
 export async function listCampaigns(clientId: string): Promise<Campaign[]> {
   return query<Campaign>(
-    'SELECT * FROM campaigns WHERE client_id = $1 ORDER BY created_at DESC',
+    `SELECT c.*,
+       (SELECT COUNT(*)::int FROM posts WHERE campaign_id = c.id) AS posts_used
+     FROM campaigns c
+     WHERE c.client_id = $1
+     ORDER BY c.created_at DESC`,
     [clientId],
   );
 }
 
-export async function getCampaign(id: string, clientId: string): Promise<CampaignWithStrategies> {
+export async function getCampaign(id: string, clientId: string): Promise<CampaignWithPosts> {
   const campaign = await queryOne<Campaign>(
-    'SELECT * FROM campaigns WHERE id = $1 AND client_id = $2',
+    `SELECT c.*,
+       (SELECT COUNT(*)::int FROM posts WHERE campaign_id = c.id) AS posts_used
+     FROM campaigns c
+     WHERE c.id = $1 AND c.client_id = $2`,
     [id, clientId],
   );
   if (!campaign) throw createError('Campaña no encontrada', 404);
 
-  const strategies = await query<Strategy>(
-    'SELECT * FROM strategies WHERE campaign_id = $1 ORDER BY position',
+  const posts = await query<PostSummary>(
+    `SELECT p.*,
+       (SELECT url FROM visual_variations WHERE post_id = p.id AND selected = TRUE LIMIT 1) AS selected_visual_url
+     FROM posts p
+     WHERE p.campaign_id = $1
+     ORDER BY p.scheduled_date ASC NULLS LAST, p.created_at DESC`,
     [id],
   );
 
-  const publications = await query<Publication>(
-    'SELECT id, platform, status, post_url, published_at FROM publications WHERE campaign_id = $1',
-    [id],
-  );
-
-  return { ...campaign, strategies, publications };
+  return { ...campaign, posts };
 }
 
 export async function createCampaign(
-  clientId:       string,
-  title:          string,
-  objective:      string,
-  targetAudience: string,
-  platforms:      string[],
-): Promise<CampaignWithStrategies> {
+  clientId:        string,
+  title:           string,
+  platforms:       string[],
+  monthYear:       string,
+  businessProfile?: {
+    businessProblem?: string;
+    differentiator?:  string;
+    idealClient?:     string;
+    concreteResult?:  string;
+    clientPain?:      string;
+  },
+): Promise<Campaign> {
   if (!platforms.length) throw createError('Selecciona al menos una plataforma', 400);
 
-  // Step 1: Create campaign row + fetch client profile — short transaction, releases connection immediately
-  const { campaign, profile } = await withTransaction(async (client: PoolClient) => {
-    const [campaign] = await client.query<Campaign>(
-      `INSERT INTO campaigns (client_id, title, objective, target_audience, platforms, status)
-       VALUES ($1, $2, $3, $4, $5, 'generating')
-       RETURNING *`,
-      [clientId, title, objective, targetAudience, platforms],
-    ).then(r => r.rows);
+  const maxPosts = await getMaxPostsForClient(clientId);
+  const bp = businessProfile ?? {};
 
-    const profileRow = await client.query(
-      'SELECT business_name, description FROM client_profiles WHERE user_id = $1',
+  const [campaign] = await query<Campaign>(
+    `INSERT INTO campaigns
+       (client_id, title, platforms, month_year, max_posts,
+        business_problem, differentiator, ideal_client, concrete_result, client_pain)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     RETURNING *, 0 AS posts_used`,
+    [
+      clientId, title, platforms, monthYear, maxPosts,
+      bp.businessProblem ?? null,
+      bp.differentiator  ?? null,
+      bp.idealClient     ?? null,
+      bp.concreteResult  ?? null,
+      bp.clientPain      ?? null,
+    ],
+  );
+  return campaign;
+}
+
+async function getMaxPostsForClient(clientId: string): Promise<number> {
+  try {
+    const rows = await query<{ max_posts_per_campaign: number }>(
+      `SELECT pl.max_posts_per_campaign
+       FROM plan_limits pl
+       JOIN client_profiles cp ON cp.plan = pl.plan
+       WHERE cp.user_id = $1`,
       [clientId],
     );
-    const profile = profileRow.rows[0] as { business_name: string; description: string };
-
-    return { campaign, profile };
-  });
-
-  logger.info(`[Campaign] Campaña ${campaign.id} creada. Llamando a Claude...`);
-
-  // Step 2: Call Claude OUTSIDE the transaction so the DB connection is free during the AI call
-  let strategies: Strategy[] = [];
-  try {
-    const drafts = await generateAdStrategies({
-      businessName:   profile?.business_name || 'Negocio',
-      description:    profile?.description   || '',
-      objective,
-      targetAudience,
-      platforms,
-    });
-
-    logger.info(`[Campaign] Claude devolvió ${drafts.length} estrategias para campaña ${campaign.id}`);
-
-    // Step 3: Save strategies + update status — another short transaction
-    strategies = await withTransaction(async (client: PoolClient) => {
-      const saved: Strategy[] = [];
-      for (let i = 0; i < drafts.length; i++) {
-        const d = drafts[i];
-        const [s] = await client.query<Strategy>(
-          `INSERT INTO strategies (campaign_id, title, description, copy_text, visual_concept, tone, target_hook, position)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-           RETURNING *`,
-          [campaign.id, d.title, d.description, d.copy_text, d.visual_concept, d.tone, d.target_hook, i + 1],
-        ).then(r => r.rows);
-        saved.push(s);
-      }
-      await client.query(
-        "UPDATE campaigns SET status = 'pending_selection' WHERE id = $1",
-        [campaign.id],
-      );
-      return saved;
-    });
-
-    campaign.status = 'pending_selection';
-  } catch (err) {
-    logger.error('[Campaign] Error generando estrategias:', err);
-
-    // Mark campaign as failed using a simple query (no transaction needed)
-    await pool.query(
-      "UPDATE campaigns SET status = 'failed', error_message = $1 WHERE id = $2",
-      [(err as Error).message, campaign.id],
-    );
-    campaign.status = 'failed';
-    campaign.error_message = (err as Error).message;
+    return rows[0]?.max_posts_per_campaign ?? 20;
+  } catch {
+    return 20;
   }
-
-  return { ...campaign, strategies, publications: [] };
 }

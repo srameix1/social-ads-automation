@@ -39,6 +39,22 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         </svg>
       ),
     },
+    {
+      href: '/connect', label: t('nav_connect'),
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+        </svg>
+      ),
+    },
+    {
+      href: '/billing', label: t('nav_billing'),
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+        </svg>
+      ),
+    },
   ];
 
   if (loading) return <PageLoader />;

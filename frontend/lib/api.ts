@@ -28,8 +28,6 @@ async function request<T>(
     console.error(`[API] Body:`, body);
     console.error(`[API] ======================`);
 
-    // Session is invalid or expired — clear local auth and redirect to login.
-    // Skip redirect if already on a public page to avoid infinite loops.
     if (res.status === 401 && typeof window !== 'undefined') {
       const onPublicPage = ['/login', '/register'].some(p =>
         window.location.pathname.startsWith(p),
@@ -37,9 +35,6 @@ async function request<T>(
       if (!onPublicPage) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
-        // Call logout to clear httpOnly cookies on the backend, then redirect.
-        // Without this, the Next.js middleware sees the stale cookie and
-        // immediately redirects /login → /dashboard, creating an infinite loop.
         fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' })
           .finally(() => { window.location.href = '/login'; });
       }
@@ -57,8 +52,12 @@ async function request<T>(
 // ── Auth ───────────────────────────────────────────────────────────────────
 export const auth = {
   register: (email: string, password: string) =>
-    request<{ token: string; user: { id: string; email: string; role: string } }>(
+    request<{ message: string }>(
       '/auth/register', { method: 'POST', body: JSON.stringify({ email, password }) },
+    ),
+  verifyEmail: (token: string) =>
+    request<{ token: string; user: { id: string; email: string; role: string } }>(
+      `/auth/verify-email?token=${encodeURIComponent(token)}`,
     ),
   login: (email: string, password: string) =>
     request<{ token: string; user: { id: string; email: string; role: string } }>(
@@ -82,6 +81,8 @@ export const clients = {
     }).then(r => r.json()),
   selectPlan: (plan: import('./types').ServicePlan) =>
     request('/clients/profile/plan', { method: 'PUT', body: JSON.stringify({ plan }) }),
+  getReelUsage: () =>
+    request<{ used: number; quota: number }>('/clients/reel-usage'),
   updateBrand: (data: {
     brand_primary_color?: string;
     brand_secondary_color?: string;
@@ -111,23 +112,141 @@ export const campaigns = {
   list: () =>
     request<{ campaigns: import('./types').Campaign[] }>('/campaigns'),
   get: (id: string) =>
-    request<{ campaign: import('./types').CampaignWithDetail }>(`/campaigns/${id}`),
+    request<{ campaign: import('./types').CampaignWithPosts }>(`/campaigns/${id}`),
   create: (data: {
-    title: string;
-    objective: string;
-    target_audience: string;
-    platforms: string[];
-  }) => request<{ campaign: import('./types').CampaignWithDetail }>(
-    '/campaigns', { method: 'POST', body: JSON.stringify(data) },
-  ),
-  selectStrategy: (campaignId: string, strategyId: string) =>
-    request(`/campaigns/${campaignId}/strategies/${strategyId}/select`, { method: 'POST' }),
-  retryPublishing: (campaignId: string) =>
-    request(`/campaigns/${campaignId}/strategies/retry`, { method: 'POST' }),
+    title:             string;
+    platforms:         string[];
+    month_year?:       string;
+    lang?:             string;
+    business_problem?: string;
+    differentiator?:   string;
+    ideal_client?:     string;
+    concrete_result?:  string;
+    client_pain?:      string;
+  }) =>
+    request<{ campaign: import('./types').Campaign }>(
+      '/campaigns', { method: 'POST', body: JSON.stringify(data) },
+    ),
   getPublications: (campaignId: string) =>
     request<{ publications: import('./types').Publication[] }>(
       `/campaigns/${campaignId}/publications`,
     ),
+};
+
+// ── Posts ──────────────────────────────────────────────────────────────────
+export const posts = {
+  list: (campaignId: string) =>
+    request<{ posts: import('./types').Post[] }>(`/campaigns/${campaignId}/posts`),
+
+  create: (campaignId: string, data: {
+    platforms:        string[];
+    format?:          import('./types').PostFormat;
+    scheduled_date?:  string;
+  }) =>
+    request<{ post: import('./types').Post }>(`/campaigns/${campaignId}/posts`, {
+      method: 'POST', body: JSON.stringify(data),
+    }),
+
+  getPost: (postId: string) =>
+    request<{ post: import('./types').PostWithDetails }>(`/posts/${postId}`),
+
+  updateDescription: (postId: string, data: {
+    post_focus?:      string;
+    // Legacy fields (backward compat with old campaigns without business profile)
+    problem?:         string;
+    differentiator?:  string;
+    ideal_client?:    string;
+    concrete_result?: string;
+    client_pain?:     string;
+  }) =>
+    request<{ post: import('./types').Post }>(`/posts/${postId}/description`, {
+      method: 'PATCH', body: JSON.stringify(data),
+    }),
+
+  generateCopy: (postId: string, lang?: string) =>
+    request<{ post: import('./types').Post; strategies: import('./types').Strategy[] }>(
+      `/posts/${postId}/generate-copy`,
+      { method: 'POST', body: JSON.stringify({ lang }) },
+    ),
+
+  selectCopy: (postId: string, strategyId: string) =>
+    request<{ post: import('./types').Post }>(`/posts/${postId}/select-copy`, {
+      method: 'POST', body: JSON.stringify({ strategy_id: strategyId }),
+    }),
+
+  selectCopyWithPhotos: (postId: string, strategyId: string, photos: File[]) => {
+    const form = new FormData();
+    form.append('strategy_id', strategyId);
+    photos.forEach(f => form.append('photos', f));
+    const token = typeof window !== 'undefined' ? (localStorage.getItem('auth_token') ?? '') : '';
+    return fetch(`${API_URL}/posts/${postId}/select-copy-with-photos`, {
+      method:      'POST',
+      credentials: 'include',
+      headers:     { Authorization: `Bearer ${token}` },
+      body:        form,
+    }).then(async r => {
+      const body = await r.json() as { error?: string; post?: import('./types').Post };
+      if (!r.ok) throw new Error(body.error ?? `HTTP ${r.status}`);
+      return body as { post: import('./types').Post };
+    });
+  },
+
+  selectVisual: (postId: string, variationId: string) =>
+    request<{ post: import('./types').Post }>(`/posts/${postId}/select-visual`, {
+      method: 'PATCH', body: JSON.stringify({ visual_variation_id: variationId }),
+    }),
+
+  confirm: (postId: string, options?: { overlay_logo?: boolean; overlay_copy?: boolean }) =>
+    request<{ post: import('./types').Post; variationUrl: string | null }>(`/posts/${postId}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify({ overlay_logo: options?.overlay_logo ?? false, overlay_copy: options?.overlay_copy ?? false }),
+    }),
+
+  update: (campaignId: string, postId: string, data: {
+    scheduled_date?:      string;
+    status?:              import('./types').PostStatus;
+    platform?:            string;
+    visual_variation_id?: string;
+  }) =>
+    request<{ post: import('./types').Post }>(`/campaigns/${campaignId}/posts/${postId}`, {
+      method: 'PATCH', body: JSON.stringify(data),
+    }),
+};
+
+// ── OAuth (social connect) ─────────────────────────────────────────────────
+export const oauth = {
+  initFacebook: () =>
+    request<{ url: string }>('/oauth/facebook/init', { method: 'POST' }),
+  initTikTok: () =>
+    request<{ url: string }>('/oauth/tiktok/init', { method: 'POST' }),
+  getFacebookPages: (token: string) =>
+    request<{ pages: Array<{ id: string; name: string }> }>(`/oauth/facebook/pages?token=${encodeURIComponent(token)}`),
+  selectFacebookPage: (token: string, pageId: string) =>
+    request<{ success: boolean }>('/oauth/facebook/select-page', {
+      method: 'POST', body: JSON.stringify({ token, pageId }),
+    }),
+  disconnect: (platform: string) =>
+    request<{ success: boolean }>(`/oauth/disconnect/${platform}`, { method: 'DELETE' }),
+};
+
+// ── Billing (Stripe) ───────────────────────────────────────────────────────
+export const billing = {
+  getStatus: () =>
+    request<import('./types').SubscriptionStatus>('/billing/status'),
+  createCheckout: (plan: string) =>
+    request<{ url: string }>('/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
+  createPortal: () =>
+    request<{ url: string }>('/billing/portal', { method: 'POST' }),
+};
+
+// ── Visual Variations (legacy) ─────────────────────────────────────────────
+export const variations = {
+  list: (campaignId: string) =>
+    request<{ variations: import('./types').VisualVariation[] }>(
+      `/campaigns/${campaignId}/variations`,
+    ),
+  select: (campaignId: string, variationId: string) =>
+    request(`/campaigns/${campaignId}/variations/${variationId}/select`, { method: 'POST' }),
 };
 
 // ── Admin ──────────────────────────────────────────────────────────────────
@@ -139,11 +258,21 @@ export const admin = {
   listClients: () =>
     request<{ clients: import('./types').User[] }>('/admin/clients'),
   getClient: (id: string) =>
-    request<{ client: import('./types').ClientProfile & { email: string; campaigns: import('./types').Campaign[] } }>(
+    request<{ client: import('./types').ClientProfile & { email: string; plan: string; campaigns: (import('./types').Campaign & { posts_used: number })[] } }>(
       `/admin/clients/${id}`,
     ),
   listCampaigns: () =>
     request<{ campaigns: import('./types').Campaign[] }>('/admin/campaigns'),
   getCampaign: (id: string) =>
-    request<{ campaign: import('./types').CampaignWithDetail }>(`/admin/campaigns/${id}`),
+    request<{ campaign: Record<string, unknown> }>(`/admin/campaigns/${id}`),
+  getPlanLimits: () =>
+    request<{ planLimits: import('./types').PlanLimits[] }>('/admin/plan-limits'),
+  updatePlanLimit: (plan: string, data: Partial<Omit<import('./types').PlanLimits, 'id' | 'plan' | 'created_at' | 'updated_at'>>) =>
+    request<{ planLimit: import('./types').PlanLimits }>(`/admin/plan-limits/${plan}`, {
+      method: 'PUT', body: JSON.stringify(data),
+    }),
+  updateCampaignMaxPosts: (campaignId: string, maxPosts: number) =>
+    request<{ success: boolean }>(`/admin/campaigns/${campaignId}/max-posts`, {
+      method: 'PATCH', body: JSON.stringify({ max_posts: maxPosts }),
+    }),
 };

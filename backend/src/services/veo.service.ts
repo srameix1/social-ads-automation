@@ -17,6 +17,7 @@ import fs   from 'fs';
 import path from 'path';
 import { env }    from '../config/env';
 import { logger } from '../utils/logger';
+import { generateVideoPrompt } from './claude.service';
 
 const VEO_MODEL    = 'veo-2.0-generate-001';
 const VEO_BASE     = 'https://generativelanguage.googleapis.com/v1beta';
@@ -69,37 +70,69 @@ export async function generateVideo(input: VideoGenerationInput): Promise<VideoG
     return { jobId, filePath: null, mimeType: 'video/mp4' };
   }
 
+  let enhancedScene: string | undefined;
+  try {
+    enhancedScene = await generateVideoPrompt({
+      visualConcept: input.prompt,
+      businessName:  input.businessName,
+      copyText:      input.copyText,
+      businessType:  input.businessName,
+      primaryColor:  '#C9A96E',
+    });
+    logger.info('[Veo] Enhanced scene prompt generated via Claude Haiku');
+  } catch (err) {
+    logger.warn(`[Veo] generateVideoPrompt failed: ${(err as Error).message} — using raw visual concept`);
+  }
+
+  const prompt = buildVideoPrompt(input, enhancedScene);
   logger.info(`[Veo] Iniciando generación de video ${input.aspectRatio} para "${input.businessName}"`);
+  logger.info(`[Veo] Endpoint: ${VEO_ENDPOINT}`);
+  logger.info(`[Veo] API key: ${apiKey.slice(0, 10)}… (longitud: ${apiKey.length})`);
+  logger.info(`[Veo] Prompt completo:\n${prompt}`);
 
   try {
     const instances: Array<{ prompt: string; image?: { bytesBase64Encoded: string; mimeType: string } }> = [
-      { prompt: buildVideoPrompt(input) },
+      { prompt },
     ];
     if (input.clientPhotos.length > 0) {
       instances[0].image = { bytesBase64Encoded: input.clientPhotos[0], mimeType: 'image/jpeg' };
     }
 
+    const requestBody = {
+      instances,
+      parameters: { aspectRatio: input.aspectRatio, sampleCount: 1 },
+    };
+    logger.info(`[Veo] Request body (sin foto): ${JSON.stringify({ ...requestBody, instances: [{ prompt }] })}`);
+
     const res = await fetch(VEO_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify({
-        instances,
-        parameters: { aspectRatio: input.aspectRatio, sampleCount: 1 },
-      }),
+      body: JSON.stringify(requestBody),
     });
 
-    const data = await res.json() as VeoLROResponse;
+    const rawText = await res.text();
+    logger.info(`[Veo] HTTP Status: ${res.status} ${res.statusText}`);
+    logger.info(`[Veo] Response body: ${rawText.slice(0, 2000)}`);
 
-    if (!res.ok) {
-      throw new Error(`Veo API ${res.status}: ${data.error?.message ?? res.statusText}`);
+    let data: VeoLROResponse;
+    try {
+      data = JSON.parse(rawText) as VeoLROResponse;
+    } catch {
+      throw new Error(`Veo devolvió respuesta no-JSON (status ${res.status}): ${rawText.slice(0, 500)}`);
     }
 
-    if (!data.name) throw new Error('Veo no devolvió nombre de operación LRO');
+    if (!res.ok) {
+      throw new Error(`Veo API ${res.status}: ${data.error?.message ?? res.statusText} | Raw: ${rawText.slice(0, 300)}`);
+    }
+
+    if (!data.name) throw new Error(`Veo no devolvió nombre de operación LRO. Response: ${rawText.slice(0, 500)}`);
 
     logger.info(`[Veo] LRO iniciada: ${data.name}`);
     return await pollLRO(data.name, apiKey, input, jobId);
   } catch (err) {
-    logger.error(`[Veo] Error generando video: ${(err as Error).message}`);
+    const error = err as Error;
+    logger.error(`[Veo] Error generando video: ${error.message}`);
+    if (error.stack) logger.error(`[Veo] Stack: ${error.stack}`);
     return { jobId, filePath: null, mimeType: 'video/mp4' };
   }
 }
@@ -214,29 +247,56 @@ async function downloadAndSaveVideo(
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function buildVideoPrompt(input: VideoGenerationInput): string {
-  const aspectDesc = {
+const CAR_DETAILING_PATTERN_VEO = /ceramic\s*coating|car\s*detail|auto\s*detail|paint\s*protection|detailing|applicator\s*pad/i;
+
+const CAR_DETAILING_HINT_VEO =
+  'The ceramic coating is a very thin, light liquid (NOT gel, NOT oil, NOT viscous). ' +
+  'When applied with a microfiber applicator pad, it barely dampens the surface with an almost invisible thin film. ' +
+  'The motion is smooth and light, like wiping with a slightly damp cloth. ' +
+  'No thick drips, no glossy gel streaks, no oil-like viscosity.';
+
+function buildVideoPrompt(input: VideoGenerationInput, enhancedScene?: string): string {
+  const durationSec = input.durationSec ?? 8;
+  const aspectDesc  = {
     '9:16': 'vertical 9:16 for Instagram Reels and TikTok',
     '16:9': 'horizontal 16:9 for YouTube/Facebook',
     '1:1':  'square 1:1 for Instagram feed',
   }[input.aspectRatio];
 
-  return `Create a ${input.durationSec ?? 7}-second professional advertising video in ${aspectDesc} format.
+  // Use the Claude Haiku-enhanced structured prompt when available;
+  // otherwise fall back to the raw visual concept with the car detailing hint.
+  const sceneBlock = enhancedScene
+    ? enhancedScene
+    : (() => {
+        const carHint = CAR_DETAILING_PATTERN_VEO.test(input.prompt)
+          ? `\nPRODUCT APPLICATION NOTE: ${CAR_DETAILING_HINT_VEO}`
+          : '';
+        return `${input.prompt}${carHint}`;
+      })();
+
+  return `Cinematic ${durationSec}-second advertising video. ${aspectDesc} format. Professional photography quality. Dynamic camera movement.
 
 BUSINESS: ${input.businessName}
-VISUAL CONCEPT: ${input.prompt}
-AD MESSAGE: ${input.copyText}
 
-VIDEO DIRECTION:
-- Show the ceramic coating process in action: application, buffing, dramatic water-beading reveal
-- Include cinematic close-up shots of luxury car surfaces with mirror-like shine
-- Smooth professional camera movements (slow pans, macro shots)
-- Aspirational lifestyle feel: luxury cars, South Florida sun, premium service
-- End on a strong hero shot of the finished car gleaming
-- NO text overlays in the video (copy applied separately)
-- Style: premium automotive commercial, cinematic lighting
+SCENE TO FILM — follow this exactly, do not substitute with abstract visuals:
+${sceneBlock}
 
-Generate a ${input.durationSec ?? 7}-second video matching these specifications.`;
+CINEMATIC DIRECTION:
+- Film EXACTLY the physical scene described above (people, objects, environment, actions)
+- Smooth, dynamic camera movement: slow dolly push-in, gentle pan, or subtle zoom
+- Sharp focus with cinematic depth of field
+- Warm, well-exposed lighting (natural daylight or warm studio light)
+- Rich color palette — vibrant, premium social media advertising feel
+- Realistic live-action footage (NOT animated, NOT illustrated, NOT CGI)
+
+ABSOLUTE PROHIBITIONS — the video must NOT contain any of these:
+- NO text, titles, subtitles, watermarks, logos, or overlays
+- NO abstract color fields, NO pulsing backgrounds, NO gradient screens
+- NO blue/green/color screens, NO digital VFX, NO glowing shapes
+- NO generic "professional" b-roll — must physically match the scene above
+- NO dark or moody noir lighting
+
+ENDING: Clean, still hero shot of the main subject — premium and aspirational. ${durationSec} seconds total.`;
 }
 
 function sleep(ms: number): Promise<void> {
