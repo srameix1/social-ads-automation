@@ -14,7 +14,14 @@ async function start() {
     client.release();
     logger.info('✓ Conexión a PostgreSQL establecida');
   } catch (err) {
-    logger.warn('⚠ PostgreSQL no disponible — el servidor inicia de todos modos');
+    logger.warn('⚠ PostgreSQL no disponible — el servidor inicia de todos modos', { error: (err as Error).message });
+    logger.warn('  Intentando conectar a:', {
+      host: env.DB.host,
+      port: env.DB.port,
+      database: env.DB.name,
+      user: env.DB.user,
+      DATABASE_URL: env.DATABASE_URL ? 'SET' : 'NOT SET',
+    });
     logger.warn('  Reactiva el proyecto en https://supabase.com/dashboard y reinicia el servidor');
   }
 
