@@ -21,9 +21,9 @@ ENV NODE_ENV=production
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-EXPOSE 80
+EXPOSE 3000
 
 ENV HOSTNAME=0.0.0.0
-ENV PORT=80
+ENV PORT=3000
 
 CMD ["node", "server.js"]
