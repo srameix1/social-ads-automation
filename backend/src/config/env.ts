@@ -1,7 +1,9 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '../../../.env') });
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: path.join(__dirname, '../../../.env') });
+}
 
 function required(name: string): string {
   const val = process.env[name];
