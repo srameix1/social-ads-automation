@@ -3,7 +3,7 @@ import './globals.css';
 import { Providers } from '@/components/Providers';
 
 export const metadata: Metadata = {
-  title:       'SANADS — Publicidad con IA',
+  title:       'SpotFlow — Publicidad con IA',
   description: 'Automatiza tu publicidad en redes sociales con inteligencia artificial',
 };
 

@@ -33,7 +33,7 @@ const es: Dict = {
   login_feature1:   'Estrategias publicitarias en segundos',
   login_feature2:   'Imágenes y videos generados con IA',
   login_feature3:   'Publica en Instagram, Facebook y TikTok',
-  login_copyright:  '© 2025 SANADS by RAMEIX LLC',
+  login_copyright:  '© 2025 SpotFlow by RAMEIX I LLC',
 
   // Register
   register_title:             'Crear cuenta',
@@ -390,7 +390,7 @@ const en: Dict = {
   login_feature1:   'Ad strategies generated in seconds',
   login_feature2:   'AI-generated images and videos',
   login_feature3:   'Publish to Instagram, Facebook and TikTok',
-  login_copyright:  '© 2025 SANADS by RAMEIX LLC',
+  login_copyright:  '© 2025 SpotFlow by RAMEIX I LLC',
 
   // Register
   register_title:             'Create account',
@@ -747,7 +747,7 @@ const pt: Dict = {
   login_feature1:   'Estratégias publicitárias em segundos',
   login_feature2:   'Imagens e vídeos gerados por IA',
   login_feature3:   'Publique no Instagram, Facebook e TikTok',
-  login_copyright:  '© 2025 SANADS by RAMEIX LLC',
+  login_copyright:  '© 2025 SpotFlow by RAMEIX I LLC',
 
   // Register
   register_title:             'Criar conta',
