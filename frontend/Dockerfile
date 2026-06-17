@@ -7,7 +7,7 @@ RUN npm ci
 
 COPY . .
 
-ENV NEXT_PUBLIC_API_URL=https://api.spotflow.pro
+ENV NEXT_PUBLIC_API_URL=https://api.spotflow.pro/api
 
 RUN npm run build
 
