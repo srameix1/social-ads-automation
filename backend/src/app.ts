@@ -24,9 +24,16 @@ const app = express();
 // ── Seguridad ──────────────────────────────────────────────────────────────
 app.use(helmet());
 app.use(cors({
-  origin:      env.FRONTEND_URL,
-  credentials: true,
+  origin:               [env.FRONTEND_URL, 'https://spotflow.pro', 'http://localhost:3000'],
+  credentials:          true,
+  methods:              ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders:       ['Content-Type', 'Authorization', 'Cookie'],
+  preflightContinue:    false,
+  optionsSuccessStatus: 204,
 }));
+
+// Manejar preflight explícitamente
+app.options('*', cors());
 
 // ── Stripe webhook necesita body crudo — ANTES de express.json() ──────────
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
