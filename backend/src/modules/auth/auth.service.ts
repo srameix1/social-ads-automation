@@ -117,13 +117,13 @@ async function sendVerificationEmail(email: string, token: string): Promise<void
   const verifyUrl = `${env.FRONTEND_URL}/verify-email?token=${token}`;
 
   const from = env.NODE_ENV === 'production'
-    ? 'noreply@sanads.com'
+    ? 'noreply@spotflow.pro'
     : 'onboarding@resend.dev';
 
   await resend.emails.send({
     from,
     to:      email,
-    subject: 'Verifica tu cuenta en SANADS',
+    subject: 'Verifica tu cuenta en SpotFlow',
     html: `
 <!DOCTYPE html>
 <html lang="es">
