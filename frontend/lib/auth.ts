@@ -1,13 +1,20 @@
 'use client';
 
+import Cookies from 'js-cookie';
+
 export function saveAuth(token: string, user: { role: string; id: string; email: string }): void {
   localStorage.setItem('auth_token', token);
   localStorage.setItem('auth_user',  JSON.stringify(user));
+
+  Cookies.set('auth_token', token,     { expires: 7, path: '/' });
+  Cookies.set('user_role',  user.role, { expires: 7, path: '/' });
 }
 
 export function clearAuth(): void {
   localStorage.removeItem('auth_token');
   localStorage.removeItem('auth_user');
+  Cookies.remove('auth_token');
+  Cookies.remove('user_role');
 }
 
 export function getStoredUser(): { id: string; email: string; role: string } | null {
