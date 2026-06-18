@@ -101,8 +101,8 @@ export function SanaddsLogo({ size = 'md', className = '' }: LogoProps) {
     <div className={`flex items-center gap-3 ${className}`}>
       <SanaddsIcon className={iconSizes[size]} />
       <span className={`font-black tracking-tight leading-none ${textSizes[size]}`}>
-        <span className="text-violet-300">SAN</span>
-        <span className="text-white">ADS</span>
+        <span className="text-violet-300">Spot</span>
+        <span className="text-white">Flow</span>
       </span>
     </div>
   );
