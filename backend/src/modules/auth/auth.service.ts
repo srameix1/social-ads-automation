@@ -134,7 +134,7 @@ async function sendVerificationEmail(email: string, token: string): Promise<void
       <table width="480" cellpadding="0" cellspacing="0" style="background:#1e293b;border-radius:16px;overflow:hidden">
         <tr>
           <td style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:32px;text-align:center">
-            <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700;letter-spacing:-0.5px">SANADS</h1>
+            <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700;letter-spacing:-0.5px">SpotFlow</h1>
             <p style="margin:6px 0 0;color:rgba(255,255,255,0.7);font-size:13px">Automatizacion de Ads</p>
           </td>
         </tr>
@@ -142,7 +142,7 @@ async function sendVerificationEmail(email: string, token: string): Promise<void
           <td style="padding:40px 32px">
             <h2 style="margin:0 0 12px;color:#f1f5f9;font-size:20px;font-weight:600">Verifica tu cuenta</h2>
             <p style="margin:0 0 28px;color:#94a3b8;font-size:15px;line-height:1.6">
-              Gracias por registrarte en SANADS. Haz clic en el boton de abajo para verificar tu direccion de email y activar tu cuenta.
+              Gracias por registrarte en SpotFlow. Haz clic en el boton de abajo para verificar tu direccion de email y activar tu cuenta.
             </p>
             <table cellpadding="0" cellspacing="0">
               <tr>
