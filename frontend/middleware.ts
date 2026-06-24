@@ -1,16 +1,23 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/register', '/verify-email'];
+// Auth pages: redirect logged-in users to their dashboard
+const AUTH_PATHS = ['/login', '/register', '/verify-email'];
+// Legal pages: always accessible regardless of auth state
+const PUBLIC_PATHS = ['/privacy', '/terms'];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const role  = req.cookies.get('user_role')?.value;
   const token = req.cookies.get('auth_token')?.value;
 
-  // Ruta pública → dejar pasar
+  // Always-public routes (legal pages) → let through unconditionally
   if (PUBLIC_PATHS.some(p => pathname.startsWith(p))) {
-    // Si ya está autenticado, redirigir al dashboard correcto
+    return NextResponse.next();
+  }
+
+  // Auth routes → redirect already-authenticated users to their dashboard
+  if (AUTH_PATHS.some(p => pathname.startsWith(p))) {
     if (token && role) {
       const dest = role === 'admin' ? '/admin' : '/dashboard';
       return NextResponse.redirect(new URL(dest, req.url));
