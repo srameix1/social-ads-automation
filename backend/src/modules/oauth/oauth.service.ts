@@ -155,12 +155,6 @@ async function storeFacebookPage(userId: string, page: FacebookPage): Promise<vo
     logger.warn('Could not fetch Instagram Business Account', { pageId: page.id });
   }
 
-  const clientRow = await queryOne<{ id: string }>(
-    'SELECT id FROM client_profiles WHERE user_id = $1',
-    [userId],
-  );
-  if (!clientRow) throw new Error('Perfil de cliente no encontrado');
-
   // Facebook credentials
   const fbEnc = encrypt(JSON.stringify({ page_access_token: page.access_token, page_id: page.id }));
   await query(
@@ -169,7 +163,7 @@ async function storeFacebookPage(userId: string, page: FacebookPage): Promise<vo
      ON CONFLICT (client_id, platform) DO UPDATE
        SET encrypted_data = EXCLUDED.encrypted_data, iv = EXCLUDED.iv,
            auth_tag = EXCLUDED.auth_tag, updated_at = NOW()`,
-    [clientRow.id, fbEnc.encrypted, fbEnc.iv, fbEnc.authTag],
+    [userId, fbEnc.encrypted, fbEnc.iv, fbEnc.authTag],
   );
 
   // Instagram credentials (auto-linked via Facebook page token)
@@ -181,7 +175,7 @@ async function storeFacebookPage(userId: string, page: FacebookPage): Promise<vo
        ON CONFLICT (client_id, platform) DO UPDATE
          SET encrypted_data = EXCLUDED.encrypted_data, iv = EXCLUDED.iv,
              auth_tag = EXCLUDED.auth_tag, updated_at = NOW()`,
-      [clientRow.id, igEnc.encrypted, igEnc.iv, igEnc.authTag],
+      [userId, igEnc.encrypted, igEnc.iv, igEnc.authTag],
     );
   }
 
