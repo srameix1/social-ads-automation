@@ -21,6 +21,7 @@ export const oauthController = {
         return;
       }
       const url = buildFacebookAuthUrl(req.user!.userId);
+      logger.info('[OAuth Debug] Facebook auth URL generated', { url });
       res.json({ url });
     } catch (err) { next(err); }
   },
