@@ -6,7 +6,7 @@ import { encrypt, decrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 
 const FB_GRAPH = 'https://graph.facebook.com/v18.0';
-const FB_SCOPE = 'pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish,pages_show_list';
+const FB_SCOPE = 'pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publishing,pages_show_list';
 const TIKTOK_AUTH_URL = 'https://www.tiktok.com/v2/auth/authorize';
 const TIKTOK_TOKEN_URL = 'https://open.tiktokapis.com/v2/oauth/token/';
 
