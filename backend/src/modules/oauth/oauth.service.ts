@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { query, queryOne } from '../../config/database';
-import { encrypt, decrypt } from '../../utils/encryption';
+import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 
 const FB_GRAPH = 'https://graph.facebook.com/v18.0';
@@ -147,12 +147,14 @@ async function storeFacebookPage(userId: string, page: FacebookPage): Promise<vo
     const igRes = await fetch(
       `${FB_GRAPH}/${page.id}?fields=instagram_business_account&access_token=${page.access_token}`,
     );
+    const igDataRaw = await igRes.text();
+    logger.info('[IG Debug] Raw response', { status: igRes.status, body: igDataRaw, pageId: page.id });
     if (igRes.ok) {
-      const igData = await igRes.json() as { instagram_business_account?: { id: string } };
+      const igData = JSON.parse(igDataRaw) as { instagram_business_account?: { id: string } };
       instagramAccountId = igData.instagram_business_account?.id ?? null;
     }
-  } catch {
-    logger.warn('Could not fetch Instagram Business Account', { pageId: page.id });
+  } catch (err) {
+    logger.warn('Could not fetch Instagram Business Account', { pageId: page.id, error: (err as Error).message });
   }
 
   // Facebook credentials
