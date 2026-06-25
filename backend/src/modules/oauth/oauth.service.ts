@@ -242,12 +242,6 @@ export async function handleTikTokCallback(code: string, stateStr: string): Prom
   };
   const { access_token, refresh_token, open_id, expires_in } = tokenData.data;
 
-  const clientRow = await queryOne<{ id: string }>(
-    'SELECT id FROM client_profiles WHERE user_id = $1',
-    [userId],
-  );
-  if (!clientRow) throw new Error('Perfil de cliente no encontrado');
-
   const credsEnc   = encrypt(JSON.stringify({ access_token, open_id }));
   const refreshEnc = encrypt(refresh_token);
   const expiresAt  = new Date(Date.now() + expires_in * 1000);
@@ -264,7 +258,7 @@ export async function handleTikTokCallback(code: string, stateStr: string): Prom
            refresh_token_iv = EXCLUDED.refresh_token_iv,
            refresh_token_tag = EXCLUDED.refresh_token_tag,
            updated_at = NOW()`,
-    [clientRow.id, credsEnc.encrypted, credsEnc.iv, credsEnc.authTag,
+    [userId, credsEnc.encrypted, credsEnc.iv, credsEnc.authTag,
      expiresAt, refreshEnc.encrypted, refreshEnc.iv, refreshEnc.authTag],
   );
 
@@ -274,22 +268,16 @@ export async function handleTikTokCallback(code: string, stateStr: string): Prom
 // ── Disconnect ─────────────────────────────────────────────────────────────
 
 export async function disconnectPlatform(userId: string, platform: string): Promise<void> {
-  const clientRow = await queryOne<{ id: string }>(
-    'SELECT id FROM client_profiles WHERE user_id = $1',
-    [userId],
-  );
-  if (!clientRow) throw new Error('Perfil de cliente no encontrado');
-
   // Disconnecting Facebook also removes Instagram (they share the token)
   if (platform === 'facebook') {
     await query(
       `DELETE FROM client_credentials WHERE client_id = $1 AND platform IN ('facebook', 'instagram')`,
-      [clientRow.id],
+      [userId],
     );
   } else {
     await query(
       'DELETE FROM client_credentials WHERE client_id = $1 AND platform = $2',
-      [clientRow.id, platform],
+      [userId, platform],
     );
   }
 
