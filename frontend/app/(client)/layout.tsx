@@ -1,17 +1,45 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { PageLoader } from '@/components/ui/Spinner';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { SanaddsLogo } from '@/components/ui/Logo';
+import { clients, credentials } from '@/lib/api';
+
+const ONBOARDING_EXEMPT = ['/select-plan', '/connect'];
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const pathname = usePathname();
+  const router   = useRouter();
   const { t } = useLanguage();
+
+  useEffect(() => {
+    if (loading || !user || user.role !== 'client') return;
+    if (ONBOARDING_EXEMPT.some(p => pathname === p || pathname.startsWith(p + '/'))) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { profile } = await clients.getProfile();
+        if (cancelled) return;
+        if (!profile.plan_selected_at) {
+          router.replace('/select-plan');
+          return;
+        }
+        const { credentials: creds } = await credentials.list();
+        if (cancelled) return;
+        if (!creds.some(c => c.connected)) {
+          router.replace('/connect');
+        }
+      } catch { /* auth errors handled by api.ts */ }
+    })();
+    return () => { cancelled = true; };
+  }, [loading, user, pathname, router]);
 
   const NAV = [
     {

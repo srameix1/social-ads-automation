@@ -41,6 +41,17 @@ async function request<T>(
       throw new Error(body.error ?? 'Sesión expirada. Por favor inicia sesión de nuevo.');
     }
 
+    if (res.status === 403 && typeof window !== 'undefined') {
+      if (body.error === 'PLAN_REQUIRED') {
+        window.location.href = '/select-plan';
+        throw new Error(body.error);
+      }
+      if (body.error === 'CONNECTION_REQUIRED') {
+        window.location.href = '/connect';
+        throw new Error(body.error);
+      }
+    }
+
     throw new Error(body.error ?? `HTTP ${res.status}`);
   }
 
@@ -81,6 +92,10 @@ export const clients = {
     }).then(r => r.json()),
   selectPlan: (plan: import('./types').ServicePlan) =>
     request('/clients/profile/plan', { method: 'PUT', body: JSON.stringify({ plan }) }),
+  choosePlan: (plan: import('./types').ServicePlan) =>
+    request<{ profile: import('./types').ClientProfile }>('/clients/select-plan', {
+      method: 'POST', body: JSON.stringify({ plan }),
+    }),
   getReelUsage: () =>
     request<{ used: number; quota: number }>('/clients/reel-usage'),
   updateBrand: (data: {

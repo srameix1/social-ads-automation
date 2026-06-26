@@ -51,6 +51,7 @@ export interface ClientProfile {
   photo_2_url:           string | null;
   photo_3_url:           string | null;
   plan:                  ServicePlan;
+  plan_selected_at:      string | null;
   brand_logo_url:        string | null;
   brand_primary_color:   string | null;
   brand_secondary_color: string | null;
