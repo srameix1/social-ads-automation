@@ -2,6 +2,17 @@ import { Request, Response, NextFunction } from 'express';
 import * as clientsService from './clients.service';
 import { getPublicUrl } from '../../utils/storage';
 
+export async function selectPlan(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { plan } = req.body as { plan: 'basic' | 'professional' | 'premium' };
+    if (!['basic', 'professional', 'premium'].includes(plan)) {
+      res.status(400).json({ error: 'Plan inválido' }); return;
+    }
+    const profile = await clientsService.selectPlan(req.user!.userId, plan);
+    res.json({ profile });
+  } catch (err) { next(err); }
+}
+
 export async function updatePlan(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { plan } = req.body as { plan: 'basic' | 'professional' | 'premium' };

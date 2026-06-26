@@ -3,12 +3,14 @@ import * as controller from './posts.controller';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize }    from '../../middleware/authorize';
 import { uploadVariationPhotos } from '../../middleware/upload';
+import { requireOnboarding } from '../../middleware/requireOnboarding';
 
 // ── Campaign-level routes — mounted at /api/campaigns/:campaignId/posts ────
 const campaignPostsRouter = Router({ mergeParams: true });
 
 campaignPostsRouter.use(authenticate);
 campaignPostsRouter.use(authorize('client'));
+campaignPostsRouter.use(requireOnboarding);
 
 campaignPostsRouter.get('/',          controller.list);
 campaignPostsRouter.post('/',         controller.create);
@@ -21,6 +23,7 @@ export const postActionsRouter = Router();
 
 postActionsRouter.use(authenticate);
 postActionsRouter.use(authorize('client'));
+postActionsRouter.use(requireOnboarding);
 
 postActionsRouter.get('/:postId',                                           controller.getPost);
 postActionsRouter.patch('/:postId/description',                             controller.updateDescription);

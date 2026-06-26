@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "skills": {
+    "ads": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "ads/SKILL.md",
+      "computedHash": "ee93851c8eb6754636d3d6a033ab8d0274d3d02a34f0cfdc04db8d5329080ed5"
+    },
+    "ads-audit": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-audit/SKILL.md",
+      "computedHash": "b6e556ea541797b3e6f9641f1fbddfcc2d47c7d0f0b906a3d43189cfa9e3b48c"
+    },
+    "ads-budget": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-budget/SKILL.md",
+      "computedHash": "d2ace41e2cabf1d02305dee54e64b3b31b0b36dda24de072ab67224eb385d825"
+    },
+    "ads-competitor": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-competitor/SKILL.md",
+      "computedHash": "80ef640f97a82b2e9fb7e5ad450adac06a62972928aa8e64efbe025ae1bdacf9"
+    },
+    "ads-create": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-create/SKILL.md",
+      "computedHash": "bb2596f04fb1c6774009afd7ad5a0953628fe50a472bf4fd731942ee266c9c54"
+    },
+    "ads-creative": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-creative/SKILL.md",
+      "computedHash": "c476e42562f8d4f1a5822290d9e17af03de2db0d419d52f63dcdd417d9038c16"
+    },
+    "ads-dna": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-dna/SKILL.md",
+      "computedHash": "b10d236d45ff506badd922e7cd53dd2b482ed90fff6bf6e5f7cbc3fdd533cce5"
+    },
+    "ads-generate": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-generate/SKILL.md",
+      "computedHash": "834fc5eb70fbe5568bd14f4d9c8840a4432e50215e832c6e5e613e6693573c66"
+    },
+    "ads-google": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-google/SKILL.md",
+      "computedHash": "366e6aad5c6f051287a789565f058bcd9ec7fd34f1b691620b1e8996b358d47c"
+    },
+    "ads-landing": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-landing/SKILL.md",
+      "computedHash": "0141700e822dc9c04e45fd1c1117d7e87d993ff2b0c929bd04b1a05e132974a5"
+    },
+    "ads-math": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-math/SKILL.md",
+      "computedHash": "7364613ad8594a3261e8befc9f705cd687c6739feaec50b01859b61399e8cc23"
+    },
+    "ads-meta": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-meta/SKILL.md",
+      "computedHash": "38c9d28662049b1cddad2c69fe96e2695c136af925aa0f3c6a6d1d456b5c5184"
+    },
+    "ads-next": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-next/SKILL.md",
+      "computedHash": "3b920dcb4f9ba0740b9831568eb58c9b92a9df4814bea3aef4c6d5b785b9ce27"
+    },
+    "ads-photoshoot": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-photoshoot/SKILL.md",
+      "computedHash": "e3b9904900bef7023186b26d11cbda3ddefbf4e95d58d995590115a716bbb887"
+    },
+    "ads-plan": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-plan/SKILL.md",
+      "computedHash": "da0fbe2f9e1605edc600cee9a7200426e1c7577ea21df0b8a893505a68bb8d94"
+    },
+    "ads-publish": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-publish/SKILL.md",
+      "computedHash": "20daab30af51ae81b508e4bb270bb02dbfbe8013d78093f5490500d9a78dd794"
+    },
+    "ads-start": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-start/SKILL.md",
+      "computedHash": "51de0e163350f6efbd95c0852d11775b3698f793ff64ec1a8513df49941e08af"
+    },
+    "ads-test": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-test/SKILL.md",
+      "computedHash": "15e5b3a4e0a516ef121bb992092c2b5fc3815406bc128db1b9e100cc292b0473"
+    },
+    "ads-tiktok": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-tiktok/SKILL.md",
+      "computedHash": "62853984bd7cd72d75f5abb498d34b001b9ce8e46ceaea56d587fdf848091d77"
+    },
+    "ads-update": {
+      "source": "Hainrixz/claude-ads",
+      "sourceType": "github",
+      "skillPath": "skills/ads-update/SKILL.md",
+      "computedHash": "309f1215d9bf0576511299a3bff53e1168ce15cdf221c016b204c4dcadff801d"
+    }
+  }
+}

@@ -9,6 +9,7 @@ const router = Router();
 router.use(authenticate);
 router.use(authorize('client'));
 
+router.post('/select-plan',                               controller.selectPlan);
 router.get('/profile',              controller.getMyProfile);
 router.get('/reel-usage',           controller.getReelUsage);
 router.put('/profile',              controller.updateProfile);

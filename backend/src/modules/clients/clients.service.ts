@@ -12,6 +12,7 @@ export interface ClientProfile {
   photo_2_url:           string | null;
   photo_3_url:           string | null;
   plan:                  ServicePlan;
+  plan_selected_at:      string | null;
   brand_logo_url:        string | null;
   brand_primary_color:   string | null;
   brand_secondary_color: string | null;
@@ -106,6 +107,16 @@ export async function getAllClients() {
      WHERE u.role = 'client'
      ORDER BY u.created_at DESC`,
   );
+}
+
+export async function selectPlan(userId: string, plan: ServicePlan): Promise<ClientProfile> {
+  const profile = await queryOne<ClientProfile>(
+    `UPDATE client_profiles SET plan = $1, plan_selected_at = NOW()
+     WHERE user_id = $2 RETURNING *`,
+    [plan, userId],
+  );
+  if (!profile) throw createError('Perfil no encontrado', 404);
+  return profile;
 }
 
 export async function updatePlan(userId: string, plan: ServicePlan): Promise<ClientProfile> {
