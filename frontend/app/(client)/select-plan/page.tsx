@@ -103,9 +103,7 @@ export default function SelectPlanPage() {
                   'w-full py-2.5 rounded-lg text-sm font-semibold transition-all duration-150',
                   isActive
                     ? 'bg-brand-600/60 text-white/70 cursor-wait'
-                    : isPro || isPremium
-                      ? 'bg-gradient-to-r from-brand-600 to-violet-600 hover:from-brand-500 hover:to-violet-500 text-white'
-                      : 'bg-white/10 hover:bg-white/15 text-slate-200',
+                    : 'bg-gradient-to-r from-brand-600 to-violet-600 hover:from-brand-500 hover:to-violet-500 text-white',
                   pending && !isActive ? 'opacity-40 cursor-not-allowed' : '',
                 ].join(' ')}
               >
