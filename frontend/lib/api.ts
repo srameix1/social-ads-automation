@@ -1,5 +1,14 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
+export class ApiError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+  }
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -21,12 +30,16 @@ async function request<T>(
   console.log(`[API] ${options.method ?? 'GET'} ${path} → ${res.status}`);
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
+    const body = await res.json().catch(() => ({ error: res.statusText })) as { error?: string; message?: string };
     console.error(`[API] ===== ERROR HTTP =====`);
     console.error(`[API] Status: ${res.status} ${res.statusText}`);
     console.error(`[API] URL: ${res.url}`);
     console.error(`[API] Body:`, body);
     console.error(`[API] ======================`);
+
+    // When body has both error (code) + message (human text), extract both
+    const displayMessage = body.message ?? body.error ?? `HTTP ${res.status}`;
+    const errorCode      = body.message !== undefined ? body.error : undefined;
 
     if (res.status === 401 && typeof window !== 'undefined') {
       const onPublicPage = ['/login', '/register'].some(p =>
@@ -38,21 +51,21 @@ async function request<T>(
         fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' })
           .finally(() => { window.location.href = '/login'; });
       }
-      throw new Error(body.error ?? 'Sesión expirada. Por favor inicia sesión de nuevo.');
+      throw new ApiError(displayMessage, errorCode);
     }
 
     if (res.status === 403 && typeof window !== 'undefined') {
       if (body.error === 'PLAN_REQUIRED') {
         window.location.href = '/select-plan';
-        throw new Error(body.error);
+        throw new ApiError(body.error);
       }
       if (body.error === 'CONNECTION_REQUIRED') {
         window.location.href = '/connect';
-        throw new Error(body.error);
+        throw new ApiError(body.error);
       }
     }
 
-    throw new Error(body.error ?? `HTTP ${res.status}`);
+    throw new ApiError(displayMessage, errorCode);
   }
 
   const data = await res.json() as T;
@@ -73,6 +86,10 @@ export const auth = {
   login: (email: string, password: string) =>
     request<{ token: string; user: { id: string; email: string; role: string } }>(
       '/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) },
+    ),
+  resendVerification: (email: string) =>
+    request<{ message: string }>(
+      '/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) },
     ),
   logout: () => request('/auth/logout', { method: 'POST' }),
   me:     () => request<{ user: { id: string; email: string; role: string } }>('/auth/me'),

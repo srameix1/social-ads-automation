@@ -69,6 +69,20 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
   }
 }
 
+export async function resendVerification(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { email } = req.body as { email?: unknown };
+    if (!email || typeof email !== 'string') {
+      res.status(400).json({ error: 'Email requerido' });
+      return;
+    }
+    const result = await authService.resendVerification(email.trim().toLowerCase());
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export function logout(_req: Request, res: Response): void {
   res.clearCookie('auth_token');
   res.clearCookie('user_role');

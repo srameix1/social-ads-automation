@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { auth } from '@/lib/api';
+import { auth, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LanguageToggle } from '@/components/ui/LanguageToggle';
@@ -14,21 +14,39 @@ export default function RegisterPage() {
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [confirm,  setConfirm]  = useState('');
-  const [error,    setError]    = useState('');
-  const [loading,  setLoading]  = useState(false);
-  const [sent,     setSent]     = useState(false);
+  const [error,         setError]         = useState('');
+  const [loading,       setLoading]       = useState(false);
+  const [sent,          setSent]          = useState(false);
+  const [showResend,    setShowResend]    = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSent,    setResendSent]    = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirm) { setError(t('register_err_mismatch') as string); return; }
     if (password.length < 8)  { setError(t('register_err_short') as string);    return; }
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setShowResend(false); setResendSent(false);
     try {
       await auth.register(email, password);
       setSent(true);
     } catch (err) {
-      setError((err as Error).message);
+      const apiErr = err as ApiError;
+      if (apiErr.code === 'EMAIL_EXISTS_UNVERIFIED') setShowResend(true);
+      setError(apiErr.message);
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResendLoading(true); setError('');
+    try {
+      await auth.resendVerification(email);
+      setResendSent(true);
+      setShowResend(false);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -109,6 +127,23 @@ export default function RegisterPage() {
               </svg>
               {error}
             </div>
+          )}
+
+          {showResend && (
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resendLoading}
+              className="w-full py-2.5 rounded-xl border border-brand-500/40 text-brand-400 hover:bg-brand-500/10 text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              {resendLoading ? t('resend_verification_sending') : t('resend_verification_btn')}
+            </button>
+          )}
+
+          {resendSent && (
+            <p className="text-emerald-400 text-sm text-center px-2">
+              {t('resend_verification_sent')}
+            </p>
           )}
 
           <Button type="submit" loading={loading} className="w-full" size="lg">

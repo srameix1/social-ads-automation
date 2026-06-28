@@ -55,8 +55,15 @@ const es: Dict = {
   verify_email_success_title: '¡Email verificado!',
   verify_email_success_sub:   'Tu cuenta está activa. Iniciando sesión...',
   verify_email_error_title:   'Link inválido o expirado',
-  verify_email_error_sub:     'El link de verificación no es válido o ya expiró. Por favor regístrate de nuevo.',
+  verify_email_error_sub:     'El link de verificación no es válido o ya expiró. Ingresa tu correo para recibir uno nuevo.',
   verify_email_go_register:   'Volver al registro',
+
+  // Resend verification (shared across login, register, verify-email)
+  resend_verification_btn:      'Reenviar email de verificación',
+  resend_verification_sending:  'Enviando...',
+  resend_verification_sent:     'Si tu correo existe en el sistema, te enviamos un nuevo link de verificación.',
+  resend_verification_email_ph: 'tu@email.com',
+  resend_verification_too_many: 'Demasiados intentos. Espera unos minutos.',
 
   // Dashboard
   dash_welcome:          'Bienvenido de vuelta',
@@ -412,8 +419,15 @@ const en: Dict = {
   verify_email_success_title: 'Email verified!',
   verify_email_success_sub:   'Your account is active. Signing you in...',
   verify_email_error_title:   'Invalid or expired link',
-  verify_email_error_sub:     'The verification link is invalid or has expired. Please register again.',
+  verify_email_error_sub:     'The verification link is invalid or has expired. Enter your email to receive a new one.',
   verify_email_go_register:   'Back to register',
+
+  // Resend verification (shared across login, register, verify-email)
+  resend_verification_btn:      'Resend verification email',
+  resend_verification_sending:  'Sending...',
+  resend_verification_sent:     'If your email exists in our system, we sent you a new verification link.',
+  resend_verification_email_ph: 'you@email.com',
+  resend_verification_too_many: 'Too many attempts. Please wait a few minutes.',
 
   // Dashboard
   dash_welcome:          'Welcome back',
@@ -769,8 +783,15 @@ const pt: Dict = {
   verify_email_success_title: 'Email verificado!',
   verify_email_success_sub:   'Sua conta está ativa. Entrando...',
   verify_email_error_title:   'Link inválido ou expirado',
-  verify_email_error_sub:     'O link de verificação é inválido ou expirou. Por favor cadastre-se novamente.',
+  verify_email_error_sub:     'O link de verificação é inválido ou expirou. Informe seu e-mail para receber um novo.',
   verify_email_go_register:   'Voltar ao cadastro',
+
+  // Resend verification (shared across login, register, verify-email)
+  resend_verification_btn:      'Reenviar email de verificação',
+  resend_verification_sending:  'Enviando...',
+  resend_verification_sent:     'Se o seu e-mail existir no sistema, enviamos um novo link de verificação.',
+  resend_verification_email_ph: 'seu@email.com',
+  resend_verification_too_many: 'Muitas tentativas. Aguarde alguns minutos.',
 
   // Dashboard
   dash_welcome:          'Bem-vindo de volta',

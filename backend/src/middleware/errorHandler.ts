@@ -4,12 +4,14 @@ import { logger } from '../utils/logger';
 export interface AppError extends Error {
   statusCode?: number;
   isOperational?: boolean;
+  code?: string;
 }
 
-export function createError(message: string, statusCode: number): AppError {
+export function createError(message: string, statusCode: number, code?: string): AppError {
   const err: AppError = new Error(message);
   err.statusCode = statusCode;
   err.isOperational = true;
+  if (code) err.code = code;
   return err;
 }
 
@@ -28,5 +30,9 @@ export function errorHandler(
     logger.warn(err.message);
   }
 
-  res.status(status).json({ error: message });
+  if (err.code) {
+    res.status(status).json({ error: err.code, message });
+  } else {
+    res.status(status).json({ error: message });
+  }
 }

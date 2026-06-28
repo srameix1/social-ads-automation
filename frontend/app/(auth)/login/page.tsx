@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/api';
+import { auth, ApiError } from '@/lib/api';
 import { saveAuth, redirectByRole } from '@/lib/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -16,19 +16,37 @@ export default function LoginPage() {
   const { t } = useLanguage();
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
-  const [error,    setError]    = useState('');
-  const [loading,  setLoading]  = useState(false);
+  const [error,         setError]         = useState('');
+  const [loading,       setLoading]       = useState(false);
+  const [showResend,    setShowResend]    = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSent,    setResendSent]    = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setShowResend(false); setResendSent(false);
     try {
       const data = await auth.login(email, password);
       saveAuth(data.token, data.user);
       router.push(redirectByRole(data.user.role));
     } catch (err) {
-      setError((err as Error).message);
+      const apiErr = err as ApiError;
+      if (apiErr.code === 'EMAIL_UNVERIFIED') setShowResend(true);
+      setError(apiErr.message);
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResendLoading(true); setError('');
+    try {
+      await auth.resendVerification(email);
+      setResendSent(true);
+      setShowResend(false);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -121,6 +139,23 @@ export default function LoginPage() {
                 </svg>
                 {error}
               </div>
+            )}
+
+            {showResend && (
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={resendLoading}
+                className="w-full py-2.5 rounded-xl border border-brand-500/40 text-brand-400 hover:bg-brand-500/10 text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {resendLoading ? t('resend_verification_sending') : t('resend_verification_btn')}
+              </button>
+            )}
+
+            {resendSent && (
+              <p className="text-emerald-400 text-sm text-center px-2">
+                {t('resend_verification_sent')}
+              </p>
             )}
 
             <Button type="submit" loading={loading} className="w-full" size="lg">

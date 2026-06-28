@@ -22,9 +22,25 @@ export interface LoginResult {
   user:  AuthUser;
 }
 
+// In-memory rate limiter for resend-verification: max 3 per email per 15 min
+const resendRateLimiter = new Map<string, { count: number; windowStart: number }>();
+const RESEND_LIMIT      = 3;
+const RESEND_WINDOW_MS  = 15 * 60 * 1000;
+
 export async function register(email: string, password: string): Promise<{ message: string }> {
-  const existing = await queryOne('SELECT id FROM users WHERE email = $1', [email]);
-  if (existing) throw createError('Ya existe una cuenta con ese correo', 409);
+  const existing = await queryOne<{ id: string; email_verified: boolean }>(
+    'SELECT id, email_verified FROM users WHERE email = $1', [email],
+  );
+  if (existing) {
+    if (!existing.email_verified) {
+      throw createError(
+        'Ya existe una cuenta con este correo pendiente de verificación. Reenvía el email de verificación.',
+        409,
+        'EMAIL_EXISTS_UNVERIFIED',
+      );
+    }
+    throw createError('Ya existe una cuenta con ese correo', 409);
+  }
 
   const passwordHash = await bcrypt.hash(password, 10);
   const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -60,7 +76,7 @@ export async function verifyEmail(token: string): Promise<LoginResult> {
 
   const expires = new Date(row.verification_token_expires_at);
   if (expires < new Date()) {
-    throw createError('El link de verificación expiró. Por favor regístrate de nuevo.', 400);
+    throw createError('El link de verificación expiró. Solicita uno nuevo ingresando tu correo.', 400);
   }
 
   const [user] = await query<AuthUser>(
@@ -88,7 +104,7 @@ export async function login(email: string, password: string): Promise<LoginResul
   if (!valid) throw createError('Credenciales incorrectas', 401);
 
   if (!row.email_verified) {
-    throw createError('Por favor verifica tu email antes de iniciar sesión', 403);
+    throw createError('Por favor verifica tu email antes de iniciar sesión', 403, 'EMAIL_UNVERIFIED');
   }
 
   const { password_hash: _, ...user } = row;
@@ -103,6 +119,45 @@ export async function getMe(userId: string): Promise<AuthUser> {
   );
   if (!user) throw createError('Usuario no encontrado', 404);
   return user;
+}
+
+export async function resendVerification(email: string): Promise<{ message: string }> {
+  const GENERIC = { message: 'Si el correo existe, te hemos enviado un nuevo link de verificación' };
+
+  // Rate limit: max 3 attempts per email per 15 min
+  const now  = Date.now();
+  const key  = email.toLowerCase();
+  const entry = resendRateLimiter.get(key);
+
+  if (entry) {
+    if (now - entry.windowStart < RESEND_WINDOW_MS) {
+      if (entry.count >= RESEND_LIMIT) {
+        throw createError('Demasiados intentos. Espera 15 minutos antes de volver a intentar.', 429);
+      }
+      entry.count++;
+    } else {
+      resendRateLimiter.set(key, { count: 1, windowStart: now });
+    }
+  } else {
+    resendRateLimiter.set(key, { count: 1, windowStart: now });
+  }
+
+  const user = await queryOne<{ id: string; email_verified: boolean }>(
+    'SELECT id, email_verified FROM users WHERE email = $1', [email],
+  );
+
+  if (!user || user.email_verified) return GENERIC;
+
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+  const expiresAt         = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  await query(
+    `UPDATE users SET verification_token = $1, verification_token_expires_at = $2 WHERE id = $3`,
+    [verificationToken, expiresAt, user.id],
+  );
+
+  await sendVerificationEmail(email, verificationToken);
+  return GENERIC;
 }
 
 function signToken(user: AuthUser): string {
