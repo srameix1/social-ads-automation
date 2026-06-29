@@ -238,6 +238,16 @@ export default function ConnectPage() {
           Nunca los compartimos con terceros. Puedes desconectar tus cuentas en cualquier momento.
         </p>
       </div>
+
+      <div className="mt-4 p-4 rounded-xl border border-slate-700/50 bg-slate-800/30">
+        <p className="text-sm font-semibold text-white mb-2">¿Problemas para conectar?</p>
+        <p className="text-xs text-slate-400 leading-relaxed">
+          Debes ser administrador de la Página de Facebook que quieres conectar. Si necesitas ayuda, contacta a soporte en{' '}
+          <a href="mailto:contact@spotflow.pro" className="text-violet-400 hover:text-violet-300 transition-colors">
+            contact@spotflow.pro
+          </a>.
+        </p>
+      </div>
     </div>
   );
 }
