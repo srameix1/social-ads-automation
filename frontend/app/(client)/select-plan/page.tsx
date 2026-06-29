@@ -18,7 +18,7 @@ export default function SelectPlanPage() {
     setError(null);
     try {
       await clients.choosePlan(plan);
-      router.replace('/connect');
+      router.replace('/delivery-mode');
     } catch (e) {
       setError((e as Error).message);
       setPending(null);

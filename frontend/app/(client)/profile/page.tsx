@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { clients, credentials as credentialsApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import type { DeliveryMode } from '@/lib/types';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { PageLoader } from '@/components/ui/Spinner';
@@ -47,6 +48,8 @@ export default function ProfilePage() {
   const [saving,     setSaving]    = useState(false);
   const [msg,        setMsg]       = useState('');
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [modeSaving, setModeSaving] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<DeliveryMode | null>(null);
 
   // Business info editing
   const [editing,     setEditing]     = useState(false);
@@ -163,7 +166,10 @@ export default function ProfilePage() {
       {/* Business info */}
       <div className="surface rounded-xl p-5">
         <div className="flex items-start justify-between mb-5">
-          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('prof_business')}</h2>
+          <div>
+            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('prof_business')}</h2>
+            <p className="text-xs text-slate-500 mt-1">{t('prof_business_sub')}</p>
+          </div>
           <div className="flex items-center gap-3">
             {planInfo && (
               <div className="flex flex-col items-end gap-0.5">
@@ -285,6 +291,70 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+      </div>
+
+      <div className="surface rounded-xl p-5">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('delivery_mode_title')}</h2>
+            <p className="text-xs text-slate-500 mt-1">{t('delivery_mode_sub')}</p>
+          </div>
+          <div className="text-right">
+            <span className={`px-2 py-1 rounded-full text-[11px] font-semibold ${profile?.delivery_mode === 'automatic' ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-slate-700/80 text-slate-200 border border-slate-600'}`}>
+              {profile?.delivery_mode ? t(`delivery_mode_${profile.delivery_mode}`) : t('delivery_mode_not_selected')}
+            </span>
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {([
+            { key: 'automatic' as const, label: t('delivery_mode_automatic'), description: t('delivery_mode_automatic_desc') },
+            { key: 'manual' as const, label: t('delivery_mode_manual'), description: t('delivery_mode_manual_desc') },
+          ]).map(option => {
+            const active = profile?.delivery_mode === option.key;
+            return (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setSelectedMode(option.key)}
+                className={`w-full text-left rounded-2xl border p-4 transition-all ${active ? 'border-brand-500 bg-brand-500/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-100">{option.label}</p>
+                    <p className="text-sm text-slate-500 mt-2">{option.description}</p>
+                  </div>
+                  {active && (
+                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">{t('delivery_mode_active')}</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+          <Button
+            variant="primary"
+            loading={modeSaving}
+            disabled={!selectedMode || profile?.delivery_mode === selectedMode}
+            onClick={async () => {
+              if (!selectedMode) return;
+              setModeSaving(true);
+              try {
+                const result = await clients.updateDeliveryMode(selectedMode);
+                setProfile(result.profile);
+                setSelectedMode(null);
+              } catch (err) {
+                setMsg((err as Error).message);
+              } finally {
+                setModeSaving(false);
+              }
+            }}
+          >
+            {t('delivery_mode_save')}
+          </Button>
+          <span className="text-xs text-slate-500">{t('delivery_mode_note')}</span>
+        </div>
+        {msg && <p className="mt-3 text-xs text-rose-400">{msg}</p>}
       </div>
 
       {/* Social credentials */}

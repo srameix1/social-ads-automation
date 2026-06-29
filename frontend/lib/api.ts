@@ -1,5 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
+import type { DeliveryMode } from './types';
+
 export class ApiError extends Error {
   code?: string;
   constructor(message: string, code?: string) {
@@ -113,8 +115,16 @@ export const clients = {
     request<{ profile: import('./types').ClientProfile }>('/clients/select-plan', {
       method: 'POST', body: JSON.stringify({ plan }),
     }),
+  selectDeliveryMode: (delivery_mode: DeliveryMode) =>
+    request<{ profile: import('./types').ClientProfile }>('/clients/select-delivery-mode', {
+      method: 'POST', body: JSON.stringify({ delivery_mode }),
+    }),
   getReelUsage: () =>
     request<{ used: number; quota: number }>('/clients/reel-usage'),
+  updateDeliveryMode: (delivery_mode: DeliveryMode) =>
+    request<{ profile: import('./types').ClientProfile }>('/clients/profile/delivery-mode', {
+      method: 'PUT', body: JSON.stringify({ delivery_mode }),
+    }),
   updateBrand: (data: {
     brand_primary_color?: string;
     brand_secondary_color?: string;

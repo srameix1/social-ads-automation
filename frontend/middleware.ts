@@ -6,7 +6,7 @@ const AUTH_PATHS = ['/login', '/register', '/verify-email'];
 // Legal pages: always accessible regardless of auth state
 const PUBLIC_PATHS = ['/privacy', '/terms'];
 // Require auth but are exempt from the onboarding redirect check in (client)/layout.tsx
-export const ONBOARDING_EXEMPT_PATHS = ['/select-plan', '/connect'];
+export const ONBOARDING_EXEMPT_PATHS = ['/select-plan', '/delivery-mode', '/connect'];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

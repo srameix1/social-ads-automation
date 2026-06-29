@@ -184,6 +184,18 @@ async function storeFacebookPage(userId: string, page: FacebookPage): Promise<vo
   logger.info('Facebook/Instagram credentials stored via OAuth', {
     userId, pageId: page.id, instagramLinked: !!instagramAccountId,
   });
+
+  await activateFacebookServicePeriod(userId);
+}
+
+async function activateFacebookServicePeriod(userId: string): Promise<void> {
+  await query(
+    `UPDATE client_profiles
+     SET service_period_started_at = COALESCE(service_period_started_at, NOW()),
+         facebook_grace_period_ends_at = COALESCE(facebook_grace_period_ends_at, NOW() + INTERVAL '7 days')
+     WHERE user_id = $1 AND delivery_mode = 'automatic'`,
+    [userId],
+  );
 }
 
 // ── TikTok ─────────────────────────────────────────────────────────────────

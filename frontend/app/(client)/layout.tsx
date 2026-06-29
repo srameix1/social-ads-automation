@@ -10,7 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { SanaddsLogo } from '@/components/ui/Logo';
 import { clients, credentials } from '@/lib/api';
 
-const ONBOARDING_EXEMPT = ['/select-plan', '/connect'];
+const ONBOARDING_EXEMPT = ['/select-plan', '/delivery-mode', '/connect'];
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
@@ -31,10 +31,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           router.replace('/select-plan');
           return;
         }
-        const { credentials: creds } = await credentials.list();
-        if (cancelled) return;
-        if (!creds.some(c => c.connected)) {
-          router.replace('/connect');
+        if (!profile.delivery_mode) {
+          router.replace('/delivery-mode');
+          return;
+        }
+        if (profile.delivery_mode === 'automatic') {
+          const { credentials: creds } = await credentials.list();
+          if (cancelled) return;
+          if (!creds.some(c => c.connected)) {
+            router.replace('/connect');
+          }
         }
       } catch { /* auth errors handled by api.ts */ }
     })();

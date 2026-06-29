@@ -3,7 +3,8 @@ import { queryOne } from '../config/database';
 
 interface OnboardingRow {
   plan_selected_at: string | null;
-  has_creds: boolean;
+  delivery_mode:    'automatic' | 'manual' | null;
+  has_creds:        boolean;
 }
 
 export async function requireOnboarding(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -15,6 +16,7 @@ export async function requireOnboarding(req: Request, res: Response, next: NextF
   try {
     row = await queryOne<OnboardingRow>(
       `SELECT cp.plan_selected_at,
+              cp.delivery_mode,
               EXISTS(SELECT 1 FROM client_credentials cc WHERE cc.client_id = $1) AS has_creds
        FROM client_profiles cp WHERE cp.user_id = $1`,
       [req.user.userId],
@@ -28,7 +30,14 @@ export async function requireOnboarding(req: Request, res: Response, next: NextF
     if (!exempt) { res.status(403).json({ error: 'PLAN_REQUIRED' }); return; }
   }
 
-  if (row.plan_selected_at && !row.has_creds) {
+  if (row.plan_selected_at && row.delivery_mode === null) {
+    const exempt =
+      path === '/api/clients/select-delivery-mode' ||
+      path.startsWith('/api/auth/');
+    if (!exempt) { res.status(403).json({ error: 'DELIVERY_MODE_REQUIRED' }); return; }
+  }
+
+  if (row.delivery_mode === 'automatic' && !row.has_creds) {
     const exempt =
       path.startsWith('/api/oauth/') ||
       path === '/api/credentials' ||

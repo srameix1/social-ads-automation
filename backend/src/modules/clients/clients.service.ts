@@ -2,24 +2,28 @@ import { query, queryOne } from '../../config/database';
 import { createError } from '../../middleware/errorHandler';
 
 export type ServicePlan = 'basic' | 'professional' | 'premium';
+export type DeliveryMode = 'automatic' | 'manual';
 
 export interface ClientProfile {
-  id:                    string;
-  user_id:               string;
-  business_name:         string;
-  description:           string | null;
-  photo_1_url:           string | null;
-  photo_2_url:           string | null;
-  photo_3_url:           string | null;
-  plan:                  ServicePlan;
-  plan_selected_at:      string | null;
-  brand_logo_url:        string | null;
-  brand_primary_color:   string | null;
-  brand_secondary_color: string | null;
-  brand_font:            string | null;
-  setup_completed:       boolean;
-  created_at:            string;
-  updated_at:            string;
+  id:                            string;
+  user_id:                       string;
+  business_name:                 string;
+  description:                   string | null;
+  photo_1_url:                   string | null;
+  photo_2_url:                   string | null;
+  photo_3_url:                   string | null;
+  plan:                          ServicePlan;
+  plan_selected_at:              string | null;
+  delivery_mode:                 DeliveryMode | null;
+  service_period_started_at:     string | null;
+  facebook_grace_period_ends_at: string | null;
+  brand_logo_url:                string | null;
+  brand_primary_color:           string | null;
+  brand_secondary_color:         string | null;
+  brand_font:                    string | null;
+  setup_completed:               boolean;
+  created_at:                    string;
+  updated_at:                    string;
 }
 
 export async function getProfile(userId: string): Promise<ClientProfile> {
@@ -126,6 +130,37 @@ export async function updatePlan(userId: string, plan: ServicePlan): Promise<Cli
   );
   if (!profile) throw createError('Perfil no encontrado', 404);
   return profile;
+}
+
+async function updateDeliveryModeInternal(userId: string, deliveryMode: DeliveryMode): Promise<ClientProfile> {
+  const profile = await queryOne<ClientProfile>(
+    `UPDATE client_profiles
+     SET delivery_mode = $1::delivery_mode,
+         service_period_started_at = CASE
+           WHEN $1::delivery_mode = 'manual' THEN NOW()
+           WHEN $1::delivery_mode = 'automatic' AND EXISTS(SELECT 1 FROM client_credentials cc WHERE cc.client_id = $2 AND cc.platform = 'facebook') THEN NOW()
+           ELSE NULL
+         END,
+         facebook_grace_period_ends_at = CASE
+           WHEN $1::delivery_mode = 'manual' THEN NULL
+           WHEN $1::delivery_mode = 'automatic' AND EXISTS(SELECT 1 FROM client_credentials cc WHERE cc.client_id = $2 AND cc.platform = 'facebook') THEN NULL
+           WHEN $1::delivery_mode = 'automatic' THEN NOW() + INTERVAL '7 days'
+           ELSE NULL
+         END
+     WHERE user_id = $2
+     RETURNING *`,
+    [deliveryMode, userId],
+  );
+  if (!profile) throw createError('Perfil no encontrado', 404);
+  return profile;
+}
+
+export async function selectDeliveryMode(userId: string, deliveryMode: DeliveryMode): Promise<ClientProfile> {
+  return updateDeliveryModeInternal(userId, deliveryMode);
+}
+
+export async function updateDeliveryMode(userId: string, deliveryMode: DeliveryMode): Promise<ClientProfile> {
+  return updateDeliveryModeInternal(userId, deliveryMode);
 }
 
 export async function updateBrand(

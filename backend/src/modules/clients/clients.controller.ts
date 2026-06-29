@@ -24,6 +24,28 @@ export async function updatePlan(req: Request, res: Response, next: NextFunction
   } catch (err) { next(err); }
 }
 
+export async function selectDeliveryMode(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { delivery_mode } = req.body as { delivery_mode: 'automatic' | 'manual' };
+    if (!['automatic', 'manual'].includes(delivery_mode)) {
+      res.status(400).json({ error: 'Modalidad inválida' }); return;
+    }
+    const profile = await clientsService.selectDeliveryMode(req.user!.userId, delivery_mode);
+    res.json({ profile });
+  } catch (err) { next(err); }
+}
+
+export async function updateDeliveryMode(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { delivery_mode } = req.body as { delivery_mode: 'automatic' | 'manual' };
+    if (!['automatic', 'manual'].includes(delivery_mode)) {
+      res.status(400).json({ error: 'Modalidad inválida' }); return;
+    }
+    const profile = await clientsService.updateDeliveryMode(req.user!.userId, delivery_mode);
+    res.json({ profile });
+  } catch (err) { next(err); }
+}
+
 export async function updateBrand(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { brand_primary_color, brand_secondary_color, brand_font } = req.body as Record<string, string>;

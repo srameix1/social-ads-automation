@@ -7,6 +7,7 @@ export interface User {
 }
 
 export type ServicePlan = 'basic' | 'professional' | 'premium';
+export type DeliveryMode = 'automatic' | 'manual';
 
 export const PLAN_DETAILS: Record<ServicePlan, {
   name: string; price: number; posts: number; features: string[]; platforms: string[];
@@ -52,6 +53,9 @@ export interface ClientProfile {
   photo_3_url:           string | null;
   plan:                  ServicePlan;
   plan_selected_at:      string | null;
+  delivery_mode:         'automatic' | 'manual' | null;
+  service_period_started_at:     string | null;
+  facebook_grace_period_ends_at: string | null;
   brand_logo_url:        string | null;
   brand_primary_color:   string | null;
   brand_secondary_color: string | null;
