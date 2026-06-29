@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { credentials, oauth } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import type { CredentialStatus } from '@/lib/types';
 
 const PLATFORM_META: Record<string, {
@@ -92,6 +93,7 @@ export default function ConnectPage() {
     return () => clearTimeout(t);
   }, [notification]);
 
+  const { logout } = useAuth();
   const statusMap = new Map(statuses.map(s => [s.platform, s]));
 
   async function connect(platform: 'facebook' | 'tiktok') {
@@ -137,6 +139,19 @@ export default function ConnectPage() {
           {notification.message}
         </div>
       )}
+
+      <div className="mb-6 rounded-2xl border border-amber-400/30 bg-amber-400/5 px-4 py-4 text-sm text-amber-50">
+        <p className="font-semibold text-amber-200">
+          Para continuar usando Spotflow, debes conectar al menos tu cuenta de Facebook.
+        </p>
+        <p className="mt-2 text-[0.93rem] text-amber-100/90">
+          ¿No puedes hacerlo ahora? Puedes{' '}
+          <button onClick={logout} className="font-medium text-amber-200 underline underline-offset-2 transition-colors hover:text-amber-100">
+            Cerrar sesión
+          </button>{' '}
+          y volver cuando tengas tus datos de Facebook listos.
+        </p>
+      </div>
 
       {loading ? (
         <div className="space-y-3">
