@@ -25,14 +25,22 @@ export async function requireOnboarding(req: Request, res: Response, next: NextF
 
   if (!row) { next(); return; }
 
+  const isGet = req.method === 'GET';
+
   if (!row.plan_selected_at) {
-    const exempt = path === '/api/clients/select-plan' || path.startsWith('/api/auth/');
+    const exempt =
+      path === '/api/clients/select-plan' ||
+      path === '/api/clients/profile' ||
+      (isGet && path === '/api/credentials') ||
+      path.startsWith('/api/auth/');
     if (!exempt) { res.status(403).json({ error: 'PLAN_REQUIRED' }); return; }
   }
 
   if (row.plan_selected_at && row.delivery_mode === null) {
     const exempt =
       path === '/api/clients/select-delivery-mode' ||
+      path === '/api/clients/profile' ||
+      (isGet && path === '/api/credentials') ||
       path.startsWith('/api/auth/');
     if (!exempt) { res.status(403).json({ error: 'DELIVERY_MODE_REQUIRED' }); return; }
   }
