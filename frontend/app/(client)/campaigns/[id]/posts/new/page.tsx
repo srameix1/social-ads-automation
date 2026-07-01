@@ -67,7 +67,7 @@ export default function NewPostPage() {
   // Step 3: visual variations
   const [variations,        setVariations]        = useState<VisualVariation[]>([]);
   const [selectedVariation, setSelectedVariation] = useState<VisualVariation | null>(null);
-  const [workflowStatus,    setWorkflowStatus]    = useState('generating_visuals');
+  const [workflowStatus,    setWorkflowStatus]    = useState('');
 
   // Overlay options (step 3, sent at confirm)
   const [overlayLogo, setOverlayLogo] = useState(false);
@@ -642,7 +642,7 @@ export default function NewPostPage() {
           <div className="space-y-5">
             <h2 className="text-sm font-semibold text-slate-200">{t('post_step3_title')}</h2>
 
-            {(workflowStatus === 'generating_visuals' || (generating && variations.length === 0)) && (
+            {(workflowStatus === 'generating_visuals' && generating) && (
               <div className="flex items-center gap-3 p-5 rounded-xl border border-brand-500/20 bg-brand-500/5">
                 <Spinner size="sm" className="text-brand-400 flex-shrink-0" />
                 <div>
