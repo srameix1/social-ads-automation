@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useCampaign } from '@/hooks/useCampaigns';
 import { posts as postsApi, clients } from '@/lib/api';
@@ -36,7 +36,9 @@ const FORMAT_OPTIONS_DEF: Record<string, FormatOption[]> = {
 
 export default function NewPostPage() {
   const { id } = useParams<{ id: string }>();
-  const router  = useRouter();
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+  const existingPostId = searchParams.get('postId');
   const { campaign, loading: campLoading } = useCampaign(id);
   const { t, lang } = useLanguage();
 
@@ -96,6 +98,35 @@ export default function NewPostPage() {
       })
       .finally(() => setProfileLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!existingPostId) return;
+    postsApi.getPost(existingPostId)
+      .then(({ post }) => {
+        setPostId(existingPostId);
+        setWorkflowStatus(post.workflow_status);
+        if (post.variations?.length) {
+          setVariations(post.variations.filter(v => v.url));
+        }
+        const targetStep = (() => {
+          switch (post.workflow_status) {
+            case 'draft':           return 0;
+            case 'described':       return 1;
+            case 'generating_copy':
+            case 'copy_ready':      return 2;
+            case 'generating_visuals':
+            case 'visuals_ready':
+            case 'visuals_failed':  return 3;
+            case 'visual_selected':
+            case 'generating_video':
+            case 'confirmed':       return 4;
+            default:                return 0;
+          }
+        })();
+        setStep(targetStep);
+      })
+      .catch(() => { /* leave step=0 as fallback */ });
+  }, [existingPostId]);
 
   useEffect(() => {
     if (step !== 3 || !postId) return;
