@@ -22,7 +22,14 @@ import postsRoutes, { postActionsRouter } from './modules/posts/posts.routes';
 const app = express();
 
 // ── Seguridad ──────────────────────────────────────────────────────────────
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      'img-src': ["'self'", 'data:', 'https://api.spotflow.pro'],
+    },
+  },
+}));
 app.use(cors({
   origin:               [env.FRONTEND_URL, 'https://spotflow.pro', 'http://localhost:3000'],
   credentials:          true,
