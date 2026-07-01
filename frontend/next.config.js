@@ -5,6 +5,7 @@ const nextConfig = {
     remotePatterns: [
       { protocol: 'http',  hostname: 'localhost' },
       { protocol: 'https', hostname: 'placehold.co' },
+      { protocol: 'https', hostname: 'api.spotflow.pro' },
     ],
   },
 };
