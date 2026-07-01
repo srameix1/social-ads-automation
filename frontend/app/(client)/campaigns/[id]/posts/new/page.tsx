@@ -671,7 +671,7 @@ export default function NewPostPage() {
                     const imgUrl   = `${BACKEND_BASE}${v.url}`;
                     const isChosen = selectedVariation?.id === v.id;
                     return (
-                      <div key={v.id} className="relative">
+                      <div key={v.id} className="relative w-full">
                         <button
                           onClick={() => setSelectedVariation(v)}
                           className={`relative rounded-xl overflow-hidden border-2 transition-all aspect-square w-full block ${
