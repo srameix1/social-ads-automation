@@ -900,7 +900,7 @@ async function generateAdImageWithText(
   logger.warn(`[ContentGen] All AI text-generation APIs failed for style "${style}" — using Sharp overlay fallback`);
   const base = photoBuffer
     ? await sharp(photoBuffer).resize(1080, 1080, { fit: 'cover', position: 'centre' }).jpeg({ quality: 92 }).toBuffer()
-    : await syntheticBg(1080, 1080, input.primaryColor, input.secondaryColor);
+    : await syntheticBg(1080, 1080, input.primaryColor ?? '', input.secondaryColor);
   const design  = fallbackDesign(style);
   const overlay = buildOverlaySVGWithDesign(1080, 1080, input, design);
   return sharp(base)
@@ -1117,8 +1117,12 @@ async function syntheticBg(
   primaryColor:    string,
   secondaryColor?: string,
 ): Promise<Buffer> {
-  const { r: r1, g: g1, b: b1 } = hexToRgb(primaryColor);
-  const sec = secondaryColor ?? '#1A1A1A';
+  // Default to an attractive dark-blue gradient when no brand colors are configured
+  const primary = (primaryColor   && primaryColor.trim())   ? primaryColor   : '#2D6BFF';
+  const secondary = (secondaryColor && secondaryColor.trim()) ? secondaryColor : '#0A0A1A';
+
+  const { r: r1, g: g1, b: b1 } = hexToRgb(primary);
+  const sec = secondary;
   const { r: r2, g: g2, b: b2 } = hexToRgb(sec);
 
   // Base layer: dark background color
