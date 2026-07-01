@@ -11,7 +11,7 @@ import { PageLoader, Spinner } from '@/components/ui/Spinner';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { Strategy, VisualVariation, PostFormat, ServicePlan } from '@/lib/types';
 
-const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace('/api', '');
+const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
 
 const ALL_PLATFORMS = [
   { id: 'instagram', label: 'Instagram', icon: '📸' },

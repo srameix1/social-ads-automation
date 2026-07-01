@@ -4,7 +4,7 @@ import { VisualVariation } from '@/lib/types';
 import { Button }          from '@/components/ui/Button';
 import { useLanguage }     from '@/contexts/LanguageContext';
 
-const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace('/api', '');
+const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
 
 interface Props {
   variation:  VisualVariation;

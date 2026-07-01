@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import type { Post } from '@/lib/types';
 
-const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace('/api', '');
+const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
 
 const WORKFLOW_STYLES: Record<string, { label: string; cls: string }> = {
   draft:               { label: 'Borrador',          cls: 'bg-slate-700 text-slate-300' },
