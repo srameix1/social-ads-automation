@@ -8,7 +8,7 @@ const STATUS_ENDPOINT  = `${KIE_BASE}/jobs/recordInfo`;
 const UPLOAD_ENDPOINT  = 'https://kieai.redpandaai.co/api/file-stream-upload';
 
 const POLL_INTERVAL_MS = 5_000;
-const MAX_WAIT_MS      = 300_000; // 5 minutes
+const MAX_WAIT_MS      = 600_000; // 10 minutes
 
 function getApiKey(): string {
   return process.env['KIE_API_KEY'] ?? '';
@@ -196,7 +196,7 @@ export async function generateHailuoVideo(
   if (!taskId) throw new Error('KIE Hailuo 2.3 returned no taskId');
 
   logger.info(`[KIE] Hailuo 2.3 task started: ${taskId}`);
-  const videoUrl = await pollTask(taskId, apiKey, 120_000);
+  const videoUrl = await pollTask(taskId, apiKey, 600_000);
   return downloadAndSave(videoUrl, outputDir, `hailuo_${Date.now()}.mp4`);
 }
 
