@@ -27,9 +27,11 @@ interface CreateTaskResponse {
 interface TaskDetail {
   code: number;
   data: {
-    taskId:  string;
-    status:  'processing' | 'succeed' | 'failed';
-    output?: { video_url?: string };
+    taskId:      string;
+    state:       'waiting' | 'queuing' | 'generating' | 'success' | 'fail';
+    resultJson?: string;
+    failCode?:   string | number | null;
+    failMsg?:    string | null;
   };
 }
 
@@ -85,18 +87,27 @@ async function pollTask(taskId: string, apiKey: string, maxWait = MAX_WAIT_MS): 
     const detail = await res.json() as TaskDetail;
     const task   = detail.data;
 
-    if (task.status === 'succeed') {
-      const url = task.output?.video_url;
-      if (!url) throw new Error('KIE task completed but returned no video_url');
+    if (task.state === 'success') {
+      if (!task.resultJson) throw new Error('KIE task succeeded but returned no resultJson');
+
+      let parsed: { resultUrls?: string[] };
+      try {
+        parsed = JSON.parse(task.resultJson);
+      } catch {
+        throw new Error(`KIE task succeeded but resultJson is malformed: ${task.resultJson.slice(0, 200)}`);
+      }
+
+      const url = parsed.resultUrls?.[0];
+      if (!url) throw new Error(`KIE task succeeded but resultUrls is empty: ${task.resultJson.slice(0, 200)}`);
       return url;
     }
 
-    if (task.status === 'failed') {
-      throw new Error('KIE task failed');
+    if (task.state === 'fail') {
+      throw new Error(`KIE task failed: ${task.failMsg ?? 'unknown error'}`);
     }
 
     const elapsedSec = Math.round((Date.now() - startTime) / 1000);
-    logger.debug(`[KIE] Polling task ${taskId} (${task.status ?? 'processing'})… ${elapsedSec}s elapsed`);
+    logger.debug(`[KIE] Polling task ${taskId} (${task.state ?? 'unknown'})… ${elapsedSec}s elapsed`);
   }
 
   throw new Error(`KIE task timed out after ${maxWait / 1000}s`);
