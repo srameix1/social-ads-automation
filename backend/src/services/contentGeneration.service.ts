@@ -2118,6 +2118,7 @@ export async function applyVideoOverlays(
   let fontFilePart = '';
   if (hasText) {
     const fontCandidates = [
+      path.join(FONTS_DIR, 'Poppins-Bold.ttf'), // bundled — works regardless of OS fonts installed
       'C:/Windows/Fonts/arialbd.ttf',
       '/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf',
       '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
@@ -2125,7 +2126,7 @@ export async function applyVideoOverlays(
       '/System/Library/Fonts/Supplemental/Arial Bold.ttf',
     ];
     const found = fontCandidates.find(fp => fs.existsSync(fp)) ?? null;
-    fontFilePart = found ? `fontfile='${found}':` : '';
+    fontFilePart = found ? `fontfile='${escapeFfmpegPath(found)}':` : '';
   }
 
   // One drawtext filter per line, stacked bottom-up; last line sits at y=h-th-80

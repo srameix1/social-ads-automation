@@ -8,6 +8,7 @@
     "db:reset": "node database/migrate.js && node database/seed.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
+    "postbuild": "node scripts/copy-assets.js",
     "start": "node dist/server.js",
     "test:gemini": "ts-node --transpile-only scripts/test-gemini.ts",
     "test:cliente-real": "node test/prueba-cliente-real.js",
