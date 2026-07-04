@@ -1778,7 +1778,28 @@ async function generateHailuoClip(
     fs.renameSync(silentStory, storyOut);
   }
 
-  await cropFillVideoClip(hailuoNorm, feedOut, 1080, 1080);
+  const feedSilent = path.join(outputDir, '_tmp_hailuo_feed_silent.mp4');
+  await cropFillVideoClip(hailuoNorm, feedSilent, 1080, 1080);
+
+  if (audioReady) {
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg()
+        .input(feedSilent)
+        .input(audio)
+        .videoCodec('copy')
+        .audioCodec('aac')
+        .audioBitrate(128)
+        .audioFilter('afade=t=out:st=8:d=2')
+        .outputOptions(['-shortest'])
+        .output(feedOut)
+        .on('end', () => resolve())
+        .on('error', (e: Error) => reject(new Error(`Hailuo feed mux: ${e.message}`)))
+        .run();
+    });
+    try { fs.unlinkSync(feedSilent); } catch { /* ignore */ }
+  } else {
+    fs.renameSync(feedSilent, feedOut);
+  }
 
   logger.info('[Hailuo] Professional video ready (story: 13s, feed: 10s)');
   return { feed: feedOut, story: storyOut };
