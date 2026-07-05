@@ -118,11 +118,11 @@ export async function generateVideoForSelectedVariation(
 
     let videoUrl: string;
     if (format === 'animated_video') {
-      const contentInput = await buildContentInputForPost(postId);
+      const contentInput = await buildContentInputForPost(postId, variationId);
       const { feed } = await generateProfessionalVideosFromImage(imagePath, outputDir, contentInput ?? undefined);
       videoUrl = filePathToUrl(feed);
     } else {
-      const contentInput = await buildContentInputForPost(postId);
+      const contentInput = await buildContentInputForPost(postId, variationId);
       const { reel } = await generatePremiumReelFromImage(imagePath, outputDir, contentInput ?? undefined);
       videoUrl = filePathToUrl(reel);
     }
@@ -145,7 +145,7 @@ export async function generateVideoForSelectedVariation(
   }
 }
 
-async function buildContentInputForPost(postId: string): Promise<ContentInput | null> {
+async function buildContentInputForPost(postId: string, variationId?: string): Promise<ContentInput | null> {
   const row = await queryOne<{
     problem:                   string | null;
     differentiator:            string | null;
@@ -188,11 +188,25 @@ async function buildContentInputForPost(postId: string): Promise<ContentInput | 
     row.campaign_differentiator   ?? row.differentiator,
   ].filter(Boolean);
 
+  // Fold in the selected variation's visual_concept_variant (e.g. "ai-bold"),
+  // if any, so a clean regeneration of its scene stays close to what the
+  // client actually picked — same fallback chain used for media_assets.prompt_used.
+  let visualConcept = row.visual_concept ?? undefined;
+  if (variationId) {
+    const variation = await queryOne<{ visual_concept_variant: string | null }>(
+      'SELECT visual_concept_variant FROM visual_variations WHERE id = $1',
+      [variationId],
+    );
+    if (variation?.visual_concept_variant) {
+      visualConcept = [visualConcept, variation.visual_concept_variant].filter(Boolean).join('. ');
+    }
+  }
+
   return {
     businessName:   row.business_name  ?? 'Negocio',
     description:    descParts.join(' ') || undefined,
     postFocus:      row.post_focus      ?? undefined,
-    visualConcept:  row.visual_concept  ?? undefined,
+    visualConcept,
     copyText:       row.copy_text       ?? '',
     primaryColor:   row.primary_color   ?? '#1A1A1A',
     secondaryColor: row.secondary_color ?? undefined,

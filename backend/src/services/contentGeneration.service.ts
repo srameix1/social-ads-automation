@@ -348,11 +348,8 @@ export async function generatePremiumReel(
   // ── Clip 2 (8s): Gemini clean image — same visual_concept as Veo 2 clip 1 ─
   // No copy or logo here; branding appears only in the closing card.
   logger.info('[ContentGen] Reel — clip 2: Gemini clean image (visual concept)…');
-  const bgBuffer = await getBackground(input, 1080, 1920);
-  await sharp(bgBuffer)
-    .resize(1080, 1920, { fit: 'cover', position: 'centre' })
-    .jpeg({ quality: 92 })
-    .toFile(clip2ImgPath);
+  const bgBuffer = await generateCleanBrandImage(input, 1080, 1920);
+  fs.writeFileSync(clip2ImgPath, bgBuffer);
   const clip2 = path.join(outputDir, '_tmp_reel_clip2.mp4');
   await kenBurnsVideo(clip2ImgPath, clip2, 1080, 1920, 8, null, 0.00135);
 
@@ -528,11 +525,8 @@ async function _runPremiumReelFromImage(
   let clip2GenOk = false;
   if (input?.visualConcept) {
     try {
-      const bgBuffer = await getBackground(input, 1080, 1920);
-      await sharp(bgBuffer)
-        .resize(1080, 1920, { fit: 'cover', position: 'centre' })
-        .jpeg({ quality: 92 })
-        .toFile(clip2ImgPath);
+      const bgBuffer = await generateCleanBrandImage(input, 1080, 1920);
+      fs.writeFileSync(clip2ImgPath, bgBuffer);
       clip2GenOk = true;
     } catch (err) {
       logger.warn(`[ContentGen] Reel — Gemini clip 2 failed, using selected image: ${(err as Error).message}`);
@@ -947,6 +941,7 @@ async function getBackground(
   input:  ContentInput,
   width:  number,
   height: number,
+  allowSyntheticFallback: boolean = true,
 ): Promise<Buffer> {
   const geminiKey = GEMINI_API_KEY_ENV();
   if (geminiKey) {
@@ -970,8 +965,34 @@ async function getBackground(
     logger.warn('[ContentGen] OPENAI_API_KEY not set — skipping DALL-E');
   }
 
+  if (!allowSyntheticFallback) {
+    throw new Error('All AI image providers failed (synthetic fallback disabled for this caller)');
+  }
+
   logger.warn('[ContentGen] All AI providers failed — synthetic background');
   return syntheticBg(width, height, input.primaryColor, input.secondaryColor);
+}
+
+// Clean (no-text, no-logo) regeneration of the same visual_concept scene, sized
+// and cropped to the target dimensions. Shared by Premium (reel clip 2, closing
+// card bg) and Professional (Hailuo source frame) — anything that must NOT show
+// AI-baked copy text should composite on top of this instead of a branded variation.
+//
+// allowSyntheticFallback=false makes this throw instead of silently returning a
+// flat gradient when Gemini/DALL-E both fail — used by callers (Hailuo) that
+// have a better fallback of their own (the original branded image) and would
+// rather use that than animate an unbranded gradient.
+async function generateCleanBrandImage(
+  input:  ContentInput,
+  width:  number,
+  height: number,
+  allowSyntheticFallback: boolean = true,
+): Promise<Buffer> {
+  const bgBuffer = await getBackground(input, width, height, allowSyntheticFallback);
+  return sharp(bgBuffer)
+    .resize(width, height, { fit: 'cover', position: 'centre' })
+    .jpeg({ quality: 92 })
+    .toBuffer();
 }
 
 async function callGemini(
@@ -1713,8 +1734,27 @@ async function generateHailuoClip(
   const storyOut = path.join(outputDir, 'professional_story.mp4');
   const feedOut  = path.join(outputDir, 'professional_feed.mp4');
 
-  const prompt  = input.visualConcept ? await buildEnhancedVideoPrompt(input) : `Professional advertising video for ${input.businessName}`;
-  const rawPath = await kie.generateHailuoVideo(prompt, imagePath, outputDir);
+  // Hailuo deforms AI-baked copy text when animating it, so animate a clean
+  // (no-text) regeneration of the same scene instead — the copy is added
+  // back afterward via applyVideoOverlays. Falls back to the branded
+  // variation (with text) if the clean regeneration fails: a video with
+  // deformed text beats no video.
+  let hailuoSourceImg = imagePath;
+  if (input.visualConcept) {
+    try {
+      const cleanBuf      = await generateCleanBrandImage(input, 1080, 1080, false);
+      const cleanImgPath  = path.join(outputDir, '_tmp_hailuo_clean.jpg');
+      fs.writeFileSync(cleanImgPath, cleanBuf);
+      hailuoSourceImg = cleanImgPath;
+      logger.info('[Hailuo] Using clean (no-text) regenerated scene as source frame');
+    } catch (err) {
+      logger.warn(`[Hailuo] Clean image generation failed, using branded variation: ${(err as Error).message}`);
+    }
+  }
+
+  const basePrompt = input.visualConcept ? await buildEnhancedVideoPrompt(input) : `Professional advertising video for ${input.businessName}`;
+  const prompt     = `${basePrompt} No text, no signs, no captions, no subtitles, no watermarks, no UI elements.`;
+  const rawPath    = await kie.generateHailuoVideo(prompt, hailuoSourceImg, outputDir);
 
   // Normalize Hailuo 10s clip to 1080×1920
   const hailuoNorm = path.join(outputDir, '_tmp_hailuo_norm.mp4');
