@@ -364,7 +364,7 @@ export async function generatePremiumReel(
   } catch (grokErr) {
     logger.warn(`[ContentGen] Reel — Grok failed: ${(grokErr as Error).message} — trying Kling 3.0…`);
     try {
-      const klingPath = await generateKling3Video(input, outputDir);
+      const klingPath = await generateKling3Video(clip2ImgPath, input, outputDir);
       if (!klingPath) throw new Error('Kling 3.0 devolvió null');
       clip1 = klingPath;
       logger.info('[ContentGen] Reel — clip 1: Kling 3.0 success');
@@ -435,7 +435,7 @@ export async function generateProfessionalVideosFromImage(
     // 2. Kling 3.0 via Higgsfield CLI (consistent 60-90s)
     logger.info('[ContentGen] Professional — Kling 3.0…');
     try {
-      const klingPath = await generateKling3Video(input, outputDir);
+      const klingPath = await generateKling3Video(imagePath, input, outputDir);
       if (klingPath) {
         logger.info('[ContentGen] Professional — Kling 3.0 success');
         return await buildStoryWithClosingCard(klingPath, imagePath, input, outputDir, 'kling', feedOut, storyOut);
@@ -555,7 +555,7 @@ async function _runPremiumReelFromImage(
       logger.warn(`[ContentGen] Reel — Grok failed: ${(grokErr as Error).message} — trying Kling 3.0…`);
       // 2. Kling 3.0
       try {
-        const klingPath = await generateKling3Video(input, outputDir);
+        const klingPath = await generateKling3Video(clip2ImgPath, input, outputDir);
         if (!klingPath) throw new Error('Kling 3.0 returned null');
         clip1 = klingPath;
         logger.info('[ContentGen] Reel — clip 1: Kling 3.0 success');
@@ -1932,7 +1932,45 @@ function extractVideoUrl(stdout: string): string | null {
   return match?.[0] ?? null;
 }
 
+// Run one Higgsfield CLI subcommand and return its trimmed stdout.
+// shell is ONLY enabled on Windows, to resolve the .cmd shim for local dev —
+// with shell:true, Node concatenates argv into a single string and hands it to
+// sh -c, which re-splits on whitespace; a --prompt value with spaces would
+// blow up into extra positional args ("Too many positional args") on Linux.
+// With shell:false (production), args are passed as a real argv array with no
+// re-parsing, so multi-word --prompt/--start-image values survive intact.
+function runHiggsfieldCli(args: string[], timeoutMs: number): Promise<string> {
+  const isWindows = process.platform === 'win32';
+  const higgsCmd  = isWindows ? 'higgsfield.cmd' : 'higgsfield';
+
+  return new Promise<string>((resolve, reject) => {
+    const child = spawn(higgsCmd, args, { shell: isWindows, stdio: ['ignore', 'pipe', 'pipe'] });
+
+    let out = '';
+    let err = '';
+    child.stdout!.on('data', (d: Buffer) => { out += d.toString(); });
+    child.stderr!.on('data', (d: Buffer) => { err += d.toString(); });
+
+    const killTimer = setTimeout(() => {
+      child.kill();
+      reject(new Error(`[Kling3] CLI command timed out after ${Math.round(timeoutMs / 1000)}s: ${args.join(' ')}`));
+    }, timeoutMs);
+
+    child.on('close', (code: number | null) => {
+      clearTimeout(killTimer);
+      if (code === 0) resolve(out.trim());
+      else reject(new Error(`higgsfield ${args.slice(0, 2).join(' ')} exited with code ${code ?? 'null'}: ${err.slice(0, 400)}`));
+    });
+
+    child.on('error', (e: Error) => {
+      clearTimeout(killTimer);
+      reject(e);
+    });
+  });
+}
+
 export async function generateKling3Video(
+  imagePath: string,
   input:     ContentInput,
   outputDir: string,
 ): Promise<string | null> {
@@ -1942,53 +1980,50 @@ export async function generateKling3Video(
   }
 
   logger.info(`[Kling3] Starting video generation for "${input.businessName}"`);
-  const prompt = await buildEnhancedVideoPrompt(input);
 
-  // Pass the prompt via stdin instead of --prompt "..." CLI arg.
-  // With shell:true (required for .cmd on Windows) the shell re-parses the
-  // argument string, so quotes, $, backticks, etc. in the prompt cause
-  // "Too many positional args". Stdin bypasses shell parsing entirely.
-  // Higgsfield CLI reads stdin as the prompt when --prompt is omitted
-  // (documented in SKILL.md: `echo "..." | higgsfield generate create ...`).
-  const isWindows = process.platform === 'win32';
-  const higgsCmd  = isWindows ? 'higgsfield.cmd' : 'higgsfield';
+  // Kling deforms AI-baked copy text the same way Hailuo does, so animate a
+  // clean (no-text) regeneration of the scene instead. Falls back to the
+  // branded variation (with text) if the clean regeneration fails.
+  let kling3SourceImg = imagePath;
+  try {
+    const cleanBuf     = await generateCleanBrandImage(input, 1080, 1920, false);
+    const cleanImgPath = path.join(outputDir, '_tmp_kling3_clean.jpg');
+    fs.writeFileSync(cleanImgPath, cleanBuf);
+    kling3SourceImg = cleanImgPath;
+    logger.info('[Kling3] Using clean (no-text) regenerated scene as source frame');
+  } catch (err) {
+    logger.warn(`[Kling3] Clean image generation failed, using branded variation: ${(err as Error).message}`);
+  }
 
-  const stdout = await new Promise<string>((resolve, reject) => {
-    const child = spawn(higgsCmd, [
-      'generate', 'create', 'kling3_0',
-      '--aspect_ratio', '9:16',
-      '--wait',
-      '--wait-timeout', '12m',
-      '--json',
-    ], { shell: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  const basePrompt = await buildEnhancedVideoPrompt(input);
+  const prompt     = `${basePrompt} No text, no signs, no captions, no subtitles, no watermarks, no UI elements.`;
 
-    let out = '';
-    let err = '';
-    child.stdout!.on('data', (d: Buffer) => { out += d.toString(); });
-    child.stderr!.on('data', (d: Buffer) => { err += d.toString(); });
+  // 1. Upload the source image — stdout is the bare upload_id (UUID).
+  logger.info('[Kling3] Uploading source image…');
+  const uploadId = await runHiggsfieldCli(['upload', 'create', kling3SourceImg], 2 * 60 * 1000);
+  if (!uploadId) throw new Error('[Kling3] upload create returned no upload_id');
+  logger.info(`[Kling3] Uploaded → ${uploadId}`);
 
-    child.stdin!.write(prompt);
-    child.stdin!.end();
+  // 2. Create the generation job — stdout is the bare job_id (no --wait here;
+  //    we poll explicitly in step 3 so job creation itself returns quickly).
+  const jobId = await runHiggsfieldCli([
+    'generate', 'create', 'kling3_0',
+    '--prompt',       prompt,
+    '--start-image',  uploadId,
+    '--duration',     '10',
+    '--aspect-ratio', '9:16',
+    '--mode',         'std',
+  ], 60 * 1000);
+  if (!jobId) throw new Error('[Kling3] generate create returned no job_id');
+  logger.info(`[Kling3] Job started: ${jobId}`);
 
-    const killTimer = setTimeout(() => {
-      child.kill();
-      reject(new Error('[Kling3] CLI timeout exceeded 13 min'));
-    }, 13 * 60 * 1000);
-
-    child.on('close', (code: number | null) => {
-      clearTimeout(killTimer);
-      if (code === 0) resolve(out);
-      else reject(new Error(`higgsfield exited with code ${code ?? 'null'}: ${err.slice(0, 400)}`));
-    });
-
-    child.on('error', (e: Error) => {
-      clearTimeout(killTimer);
-      reject(e);
-    });
-  });
-
-  const videoUrl = extractVideoUrl(stdout);
-  if (!videoUrl) throw new Error('No video URL found in Higgsfield response');
+  // 3. Wait for the job — stdout prints the result video URL on completion.
+  const waitOut = await runHiggsfieldCli(
+    ['generate', 'wait', jobId, '--timeout', '12m', '--quiet'],
+    13 * 60 * 1000,
+  );
+  const videoUrl = extractVideoUrl(waitOut);
+  if (!videoUrl) throw new Error(`[Kling3] No video URL found in wait output: ${waitOut.slice(0, 300)}`);
 
   logger.info(`[Kling3] Video generated, downloading: ${videoUrl.slice(0, 80)}…`);
   const dlRes = await fetch(videoUrl);

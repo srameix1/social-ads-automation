@@ -9,8 +9,9 @@
 if (!process.env.JWT_SECRET)     process.env.JWT_SECRET     = 'standalone-test-script-placeholder';
 if (!process.env.ENCRYPTION_KEY) process.env.ENCRYPTION_KEY = 'a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890';
 
-import path from 'path';
-import fs   from 'fs';
+import path  from 'path';
+import fs    from 'fs';
+import sharp from 'sharp';
 
 require('dotenv').config({ path: path.join(__dirname, '../../../.env') });
 
@@ -18,6 +19,10 @@ import { generateKling3Video } from '../services/contentGeneration.service';
 
 const OUTPUT_DIR = path.join(__dirname, '../../test-output');
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+
+// generateKling3Video now takes a source image (the branded variation, or clean
+// scene fallback) — this placeholder stands in for it in this standalone test.
+const PLACEHOLDER_IMAGE = path.join(OUTPUT_DIR, '_test_kling3_placeholder.jpg');
 
 const input = {
   businessName:  'Test Auto Detailing',
@@ -35,9 +40,13 @@ async function main() {
   console.log(`Output dir: ${OUTPUT_DIR}\n`);
   console.log(`Prompt: "${input.visualConcept}"\n`);
 
+  await sharp({ create: { width: 1080, height: 1920, channels: 3, background: { r: 40, g: 40, b: 40 } } })
+    .jpeg()
+    .toFile(PLACEHOLDER_IMAGE);
+
   const start = Date.now();
   try {
-    const resultPath = await generateKling3Video(input, OUTPUT_DIR);
+    const resultPath = await generateKling3Video(PLACEHOLDER_IMAGE, input, OUTPUT_DIR);
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
 
     if (resultPath) {
