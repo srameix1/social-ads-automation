@@ -20,6 +20,11 @@ FROM node:18-alpine AS runner
 
 RUN apk add --no-cache ffmpeg python3 make g++
 
+# Higgsfield CLI (Kling 3.0 reel generation) — invoked via child_process.spawn('higgsfield', ...)
+# in contentGeneration.service.ts. Runs as root here (no USER directive), so it reads
+# credentials from /root/.higgsfield — bind-mount that path from the VPS host in EasyPanel.
+RUN npm install -g @higgsfield/cli
+
 WORKDIR /app
 
 COPY package*.json ./
