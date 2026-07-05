@@ -11,6 +11,7 @@ router.use(authorize('admin'));
 router.get('/stats',                  controller.stats);
 router.get('/clients',                controller.listClients);
 router.get('/clients/:id',            controller.getClient);
+router.patch('/clients/:id',          controller.updateClient);
 router.get('/campaigns',              controller.listCampaigns);
 router.get('/campaigns/:id',          controller.getCampaign);
 router.patch('/campaigns/:id/max-posts', controller.updateCampaignMaxPosts);

@@ -1,7 +1,9 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useCampaigns } from '@/hooks/useCampaigns';
+import { clients } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { PageLoader } from '@/components/ui/Spinner';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -14,6 +16,17 @@ const PLATFORM_ICONS: Record<string, string> = {
 export default function DashboardPage() {
   const { campaigns, loading } = useCampaigns();
   const { t, lang } = useLanguage();
+  const [trial, setTrial] = useState<{ isTrial: boolean; used: number; limit: number } | null>(null);
+
+  useEffect(() => {
+    clients.getProfile()
+      .then(({ profile }) => setTrial({
+        isTrial: profile.is_trial,
+        used:    profile.posts_used,
+        limit:   profile.trial_posts_limit,
+      }))
+      .catch(() => setTrial(null));
+  }, []);
 
   if (loading) return <PageLoader />;
 
@@ -29,6 +42,12 @@ export default function DashboardPage() {
         <p className="text-slate-500 text-sm mb-1">{t('dash_welcome')}</p>
         <h1 className="text-2xl font-bold text-white">{t('dash_title')}</h1>
       </div>
+
+      {trial?.isTrial && (
+        <div className="px-4 py-3 rounded-xl border border-amber-500/20 bg-amber-500/5 text-sm text-amber-300">
+          Te quedan {Math.max(trial.limit - trial.used, 0)} publicaciones de prueba.
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">

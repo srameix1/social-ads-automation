@@ -21,6 +21,11 @@ import postsRoutes, { postActionsRouter } from './modules/posts/posts.routes';
 
 const app = express();
 
+// Trust the reverse proxy (EasyPanel) in front of this app — required for
+// req.ip / X-Forwarded-For to resolve to the real client IP instead of the
+// proxy's internal address (used for registration_ip capture at signup).
+app.set('trust proxy', 1);
+
 // ── Seguridad ──────────────────────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {

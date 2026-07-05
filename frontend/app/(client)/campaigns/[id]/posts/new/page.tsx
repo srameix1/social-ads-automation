@@ -4,10 +4,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useCampaign } from '@/hooks/useCampaigns';
-import { posts as postsApi, clients } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
+import { posts as postsApi, clients, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Input';
 import { PageLoader, Spinner } from '@/components/ui/Spinner';
+import { TrialLimitModal } from '@/components/TrialLimitModal';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { Strategy, VisualVariation, PostFormat, ServicePlan } from '@/lib/types';
 
@@ -41,12 +43,19 @@ export default function NewPostPage() {
   const existingPostId = searchParams.get('postId');
   const { campaign, loading: campLoading } = useCampaign(id);
   const { t, lang } = useLanguage();
+  const { user } = useAuth();
 
   // Plan / reel quota
   const [plan,           setPlan]           = useState<ServicePlan>('basic');
   const [reelUsed,       setReelUsed]       = useState(0);
   const [reelQuota,      setReelQuota]      = useState(8);
   const [profileLoading, setProfileLoading] = useState(true);
+
+  // Trial
+  const [isTrial,          setIsTrial]          = useState(false);
+  const [trialPostsUsed,   setTrialPostsUsed]   = useState(0);
+  const [trialPostsLimit,  setTrialPostsLimit]  = useState(0);
+  const [trialLimitReached, setTrialLimitReached] = useState(false);
 
   // Wizard state
   const [step,              setStep]              = useState(0);
@@ -87,9 +96,13 @@ export default function NewPostPage() {
     Promise.allSettled([clients.getProfile(), clients.getReelUsage()] as const)
       .then(([profileResult, reelResult]) => {
         if (profileResult.status === 'fulfilled') {
-          const clientPlan = profileResult.value.profile.plan ?? 'basic';
+          const profile = profileResult.value.profile;
+          const clientPlan = profile.plan ?? 'basic';
           setPlan(clientPlan);
           if (clientPlan === 'basic') setFormat('image');
+          setIsTrial(profile.is_trial ?? false);
+          setTrialPostsUsed(profile.posts_used ?? 0);
+          setTrialPostsLimit(profile.trial_posts_limit ?? 0);
         }
         if (reelResult.status === 'fulfilled') {
           setReelUsed(reelResult.value.used);
@@ -250,7 +263,11 @@ export default function NewPostPage() {
       setPostId(post.id);
       setStep(1);
     } catch (err) {
-      setError((err as Error).message);
+      if (err instanceof ApiError && err.code === 'TRIAL_LIMIT_REACHED') {
+        setTrialLimitReached(true);
+      } else {
+        setError((err as Error).message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -353,6 +370,10 @@ export default function NewPostPage() {
 
   return (
     <div className="max-w-2xl space-y-6 animate-fade-in">
+      {trialLimitReached && (
+        <TrialLimitModal email={user?.email ?? ''} onClose={() => setTrialLimitReached(false)} />
+      )}
+
       {/* Header */}
       <div>
         <Link href={`/campaigns/${id}`} className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors mb-4">
@@ -363,6 +384,12 @@ export default function NewPostPage() {
         </Link>
         <h1 className="text-2xl font-bold text-white">{t('post_new_title')}</h1>
       </div>
+
+      {isTrial && !trialLimitReached && (
+        <div className="px-4 py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 text-sm text-amber-300">
+          Te quedan {Math.max(trialPostsLimit - trialPostsUsed, 0)} publicaciones de prueba.
+        </div>
+      )}
 
       {/* Stepper */}
       <div className="flex items-center gap-2">

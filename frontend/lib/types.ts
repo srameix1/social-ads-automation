@@ -61,8 +61,30 @@ export interface ClientProfile {
   brand_secondary_color: string | null;
   brand_font:            string | null;
   setup_completed:       boolean;
+  is_trial:              boolean;
+  trial_posts_limit:     number;
+  posts_used:            number;
+  admin_notes:           string | null;
+  registration_ip:       string | null;
   created_at:            string;
   updated_at:            string;
+}
+
+export interface AdminClientRow {
+  id:                string;
+  email:             string;
+  is_active:         boolean;
+  created_at:        string;
+  business_name:     string;
+  setup_completed:   boolean;
+  plan:              ServicePlan;
+  campaign_count:    string | number;
+  is_trial:          boolean;
+  trial_posts_limit: number;
+  posts_used:        number;
+  admin_notes:       string | null;
+  registration_ip:   string | null;
+  duplicate_ip:      boolean;
 }
 
 export interface CredentialStatus {

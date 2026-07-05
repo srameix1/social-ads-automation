@@ -298,11 +298,15 @@ export const admin = {
     activeCampaigns: number; completedCampaigns: number;
   }>('/admin/stats'),
   listClients: () =>
-    request<{ clients: import('./types').User[] }>('/admin/clients'),
+    request<{ clients: import('./types').AdminClientRow[] }>('/admin/clients'),
   getClient: (id: string) =>
     request<{ client: import('./types').ClientProfile & { email: string; plan: string; campaigns: (import('./types').Campaign & { posts_used: number })[] } }>(
       `/admin/clients/${id}`,
     ),
+  updateClient: (id: string, data: Partial<{ trial_posts_limit: number; admin_notes: string }>) =>
+    request<{ success: boolean }>(`/admin/clients/${id}`, {
+      method: 'PATCH', body: JSON.stringify(data),
+    }),
   listCampaigns: () =>
     request<{ campaigns: import('./types').Campaign[] }>('/admin/campaigns'),
   getCampaign: (id: string) =>

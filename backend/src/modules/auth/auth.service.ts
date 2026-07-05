@@ -27,7 +27,11 @@ const resendRateLimiter = new Map<string, { count: number; windowStart: number }
 const RESEND_LIMIT      = 3;
 const RESEND_WINDOW_MS  = 15 * 60 * 1000;
 
-export async function register(email: string, password: string): Promise<{ message: string }> {
+export async function register(
+  email:          string,
+  password:       string,
+  registrationIp?: string,
+): Promise<{ message: string }> {
   const existing = await queryOne<{ id: string; email_verified: boolean }>(
     'SELECT id, email_verified FROM users WHERE email = $1', [email],
   );
@@ -53,10 +57,16 @@ export async function register(email: string, password: string): Promise<{ messa
     [email, passwordHash, verificationToken, expiresAt],
   );
 
+  // Every new client enters trial mode automatically — skips both plan
+  // selection and delivery-mode selection (delivery_mode defaults to
+  // 'manual') until they exhaust their trial posts or convert to a paid
+  // plan via /select-plan (which clears is_trial and delivery_mode again
+  // so the real onboarding gates re-engage for the paid flow).
   await query(
-    `INSERT INTO client_profiles (user_id, business_name)
-     VALUES ($1, '')`,
-    [user.id],
+    `INSERT INTO client_profiles
+       (user_id, business_name, plan_selected_at, delivery_mode, is_trial, registration_ip)
+     VALUES ($1, '', NOW(), 'manual', TRUE, $2)`,
+    [user.id, registrationIp ?? null],
   );
 
   await sendVerificationEmail(email, verificationToken);

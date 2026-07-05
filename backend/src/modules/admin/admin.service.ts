@@ -26,18 +26,51 @@ export async function getAllClients() {
   return query<{
     id: string; email: string; is_active: boolean; created_at: string;
     business_name: string; setup_completed: boolean; plan: string; campaign_count: string;
+    is_trial: boolean; trial_posts_limit: number; posts_used: number;
+    admin_notes: string | null; registration_ip: string | null;
+    duplicate_ip: boolean;
   }>(`
     SELECT u.id, u.email, u.is_active, u.created_at,
            cp.business_name, cp.setup_completed, cp.plan,
-           COUNT(c.id) AS campaign_count
+           cp.is_trial, cp.trial_posts_limit, cp.posts_used,
+           cp.admin_notes, cp.registration_ip,
+           COUNT(c.id) AS campaign_count,
+           CASE
+             WHEN cp.registration_ip IS NOT NULL
+                  AND COUNT(*) OVER (PARTITION BY cp.registration_ip) > 1
+             THEN TRUE ELSE FALSE
+           END AS duplicate_ip
     FROM users u
     LEFT JOIN client_profiles cp ON cp.user_id = u.id
     LEFT JOIN campaigns c        ON c.client_id = u.id
     WHERE u.role = 'client'
     GROUP BY u.id, u.email, u.is_active, u.created_at,
-             cp.business_name, cp.setup_completed, cp.plan
+             cp.business_name, cp.setup_completed, cp.plan,
+             cp.is_trial, cp.trial_posts_limit, cp.posts_used,
+             cp.admin_notes, cp.registration_ip
     ORDER BY u.created_at DESC
   `);
+}
+
+export async function updateClient(
+  userId: string,
+  data: Partial<{ trial_posts_limit: number; admin_notes: string }>,
+): Promise<void> {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  let i = 1;
+
+  if (data.trial_posts_limit !== undefined) { fields.push(`trial_posts_limit = $${i++}`); values.push(data.trial_posts_limit); }
+  if (data.admin_notes       !== undefined) { fields.push(`admin_notes = $${i++}`);       values.push(data.admin_notes); }
+
+  if (!fields.length) throw createError('Nada que actualizar', 400);
+
+  values.push(userId);
+  const result = await query<{ user_id: string }>(
+    `UPDATE client_profiles SET ${fields.join(', ')} WHERE user_id = $${i} RETURNING user_id`,
+    values,
+  );
+  if (!result.length) throw createError('Cliente no encontrado', 404);
 }
 
 export async function getClientDetail(id: string) {

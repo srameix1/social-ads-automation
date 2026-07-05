@@ -21,7 +21,7 @@ export async function register(req: Request, res: Response, next: NextFunction):
       return;
     }
 
-    const result = await authService.register(email, password);
+    const result = await authService.register(email, password, req.ip);
     res.status(201).json(result);
   } catch (err) {
     next(err);

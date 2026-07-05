@@ -13,6 +13,28 @@ export async function getClient(req: Request, res: Response, next: NextFunction)
   try { res.json({ client: await adminService.getClientDetail(req.params.id) }); } catch (err) { next(err); }
 }
 
+export async function updateClient(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { trial_posts_limit, admin_notes } = req.body as { trial_posts_limit?: unknown; admin_notes?: unknown };
+    const data: Partial<{ trial_posts_limit: number; admin_notes: string }> = {};
+
+    if (trial_posts_limit !== undefined) {
+      const val = parseInt(trial_posts_limit as string, 10);
+      if (isNaN(val) || val < 0) {
+        res.status(400).json({ error: 'trial_posts_limit debe ser un número no negativo' });
+        return;
+      }
+      data.trial_posts_limit = val;
+    }
+    if (admin_notes !== undefined) {
+      data.admin_notes = String(admin_notes);
+    }
+
+    await adminService.updateClient(req.params.id, data);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+}
+
 export async function listCampaigns(req: Request, res: Response, next: NextFunction): Promise<void> {
   try { res.json({ campaigns: await adminService.getAllCampaigns() }); } catch (err) { next(err); }
 }
