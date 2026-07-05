@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { clients } from '@/lib/api';
 import { PLAN_DETAILS, type ServicePlan } from '@/lib/types';
 
@@ -9,6 +9,8 @@ const PLAN_ORDER: ServicePlan[] = ['basic', 'professional', 'premium'];
 
 export default function SelectPlanPage() {
   const router  = useRouter();
+  const searchParams = useSearchParams();
+  const trialEnded = searchParams.get('trial_ended') === '1';
   const [pending, setPending] = useState<ServicePlan | null>(null);
   const [error,   setError]   = useState<string | null>(null);
 
@@ -29,9 +31,13 @@ export default function SelectPlanPage() {
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] py-12">
       {/* Header */}
       <div className="text-center mb-10">
-        <h1 className="text-3xl font-bold text-slate-100 mb-2">Elige tu plan</h1>
+        <h1 className="text-3xl font-bold text-slate-100 mb-2">
+          {trialEnded ? 'Tu prueba gratuita terminó — elige tu plan para continuar' : 'Elige tu plan'}
+        </h1>
         <p className="text-slate-400 text-sm">
-          Selecciona el plan que mejor se adapte a tu negocio para comenzar.
+          {trialEnded
+            ? 'Ya usaste todas tus publicaciones de prueba. Elige un plan para seguir creando anuncios sin límite.'
+            : 'Selecciona el plan que mejor se adapte a tu negocio para comenzar.'}
         </p>
       </div>
 

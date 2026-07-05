@@ -50,7 +50,7 @@ export function TrialLimitModal({ email, onClose }: Props) {
             Escribir por WhatsApp
           </a>
           <Link
-            href="/select-plan"
+            href="/select-plan?trial_ended=1"
             className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold transition-colors"
           >
             Ver planes
