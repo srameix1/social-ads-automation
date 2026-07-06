@@ -20,6 +20,12 @@ interface FacebookPage {
 
 interface PendingPage extends FacebookPage {}
 
+// pending_oauth_data is a JSONB column: node-postgres already deserializes it
+// to an object/array, so JSON.parse() only applies when the driver returned raw text.
+function parsePendingPages(raw: string | PendingPage[]): PendingPage[] {
+  return typeof raw === 'string' ? JSON.parse(raw) : raw;
+}
+
 // ── Facebook ───────────────────────────────────────────────────────────────
 
 export function buildFacebookAuthUrl(userId: string): string {
@@ -106,14 +112,14 @@ export async function getPendingFacebookPages(token: string): Promise<Array<{ id
   const payload = jwt.verify(token, env.JWT_SECRET) as { userId: string; action: string };
   if (payload.action !== 'facebook_page_select') throw new Error('Token inválido');
 
-  const row = await queryOne<{ pending_oauth_data: string; pending_oauth_expires_at: string }>(
+  const row = await queryOne<{ pending_oauth_data: string | PendingPage[]; pending_oauth_expires_at: string }>(
     'SELECT pending_oauth_data, pending_oauth_expires_at FROM users WHERE id = $1',
     [payload.userId],
   );
   if (!row?.pending_oauth_data) throw new Error('No hay páginas pendientes de selección');
   if (new Date(row.pending_oauth_expires_at) < new Date()) throw new Error('La selección expiró. Vuelve a conectar Facebook.');
 
-  const pages = JSON.parse(row.pending_oauth_data) as PendingPage[];
+  const pages = parsePendingPages(row.pending_oauth_data);
   return pages.map(p => ({ id: p.id, name: p.name }));
 }
 
@@ -121,14 +127,14 @@ export async function selectFacebookPage(token: string, pageId: string): Promise
   const payload = jwt.verify(token, env.JWT_SECRET) as { userId: string; action: string };
   if (payload.action !== 'facebook_page_select') throw new Error('Token inválido');
 
-  const row = await queryOne<{ pending_oauth_data: string; pending_oauth_expires_at: string }>(
+  const row = await queryOne<{ pending_oauth_data: string | PendingPage[]; pending_oauth_expires_at: string }>(
     'SELECT pending_oauth_data, pending_oauth_expires_at FROM users WHERE id = $1',
     [payload.userId],
   );
   if (!row?.pending_oauth_data) throw new Error('No hay páginas pendientes');
   if (new Date(row.pending_oauth_expires_at) < new Date()) throw new Error('La selección expiró. Vuelve a conectar Facebook.');
 
-  const pages = JSON.parse(row.pending_oauth_data) as PendingPage[];
+  const pages = parsePendingPages(row.pending_oauth_data);
   const page = pages.find(p => p.id === pageId);
   if (!page) throw new Error('Página no encontrada en la selección pendiente');
 
