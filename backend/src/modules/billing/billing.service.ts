@@ -36,15 +36,16 @@ export async function createCheckoutSession(userId: string, email: string, plan:
   const customerId = await getOrCreateStripeCustomer(userId, email);
 
   const session = await stripe.checkout.sessions.create({
-    customer:            customerId,
-    client_reference_id: userId,
-    payment_method_types: ['card'],
-    mode:                'subscription',
-    line_items:          [{ price: priceId, quantity: 1 }],
-    success_url:         `${env.FRONTEND_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url:          `${env.FRONTEND_URL}/billing?cancelled=true`,
-    metadata:            { userId, plan },
-    subscription_data:   { metadata: { userId, plan } },
+    customer:              customerId,
+    client_reference_id:   userId,
+    payment_method_types:  ['card'],
+    mode:                  'subscription',
+    line_items:            [{ price: priceId, quantity: 1 }],
+    allow_promotion_codes: true,
+    success_url:           `${env.FRONTEND_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url:            `${env.FRONTEND_URL}/select-plan`,
+    metadata:              { userId, plan },
+    subscription_data:     { metadata: { userId, plan } },
   });
 
   return session.url!;

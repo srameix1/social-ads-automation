@@ -1,14 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { clients } from '@/lib/api';
+import { useSearchParams } from 'next/navigation';
+import { billing, clients } from '@/lib/api';
 import { PLAN_DETAILS, type ServicePlan } from '@/lib/types';
 
 const PLAN_ORDER: ServicePlan[] = ['basic', 'professional', 'premium'];
 
 export default function SelectPlanPage() {
-  const router  = useRouter();
   const searchParams = useSearchParams();
   const trialEnded = searchParams.get('trial_ended') === '1';
   const [pending, setPending] = useState<ServicePlan | null>(null);
@@ -19,8 +18,11 @@ export default function SelectPlanPage() {
     setPending(plan);
     setError(null);
     try {
+      // Persiste la elección primero (satisface el gate de onboarding) y
+      // recién después manda a Stripe Checkout a cobrar.
       await clients.choosePlan(plan);
-      router.replace('/delivery-mode');
+      const { url } = await billing.createCheckout(plan);
+      window.location.href = url;
     } catch (e) {
       setError((e as Error).message);
       setPending(null);
