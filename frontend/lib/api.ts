@@ -307,6 +307,14 @@ export const admin = {
     request<{ success: boolean }>(`/admin/clients/${id}`, {
       method: 'PATCH', body: JSON.stringify(data),
     }),
+  updateCourtesy: (id: string, data: Partial<{
+    is_courtesy:         boolean;
+    courtesy_plan:       import('./types').ServicePlan | null;
+    courtesy_expires_at: string | null;
+  }>) =>
+    request<{ success: boolean }>(`/admin/clients/${id}/courtesy`, {
+      method: 'PATCH', body: JSON.stringify(data),
+    }),
   listCampaigns: () =>
     request<{ campaigns: import('./types').Campaign[] }>('/admin/campaigns'),
   getCampaign: (id: string) =>

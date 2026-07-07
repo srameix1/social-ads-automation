@@ -65,3 +65,59 @@ export async function updateCampaignMaxPosts(req: Request, res: Response, next: 
     res.json({ success: true });
   } catch (err) { next(err); }
 }
+
+const VALID_COURTESY_PLANS = ['basic', 'professional', 'premium'];
+
+export async function updateCourtesy(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { is_courtesy, courtesy_plan, courtesy_expires_at } = req.body as {
+      is_courtesy?:         unknown;
+      courtesy_plan?:       unknown;
+      courtesy_expires_at?: unknown;
+    };
+    const data: adminService.CourtesyUpdate = {};
+
+    if (is_courtesy !== undefined) {
+      if (typeof is_courtesy !== 'boolean') {
+        res.status(400).json({ error: 'is_courtesy debe ser boolean' });
+        return;
+      }
+      data.is_courtesy = is_courtesy;
+    }
+
+    if (courtesy_plan !== undefined) {
+      if (courtesy_plan !== null && !VALID_COURTESY_PLANS.includes(courtesy_plan as string)) {
+        res.status(400).json({ error: `courtesy_plan debe ser uno de: ${VALID_COURTESY_PLANS.join(', ')}` });
+        return;
+      }
+      data.courtesy_plan = courtesy_plan as string | null;
+    }
+
+    if (courtesy_expires_at !== undefined) {
+      if (courtesy_expires_at !== null && isNaN(Date.parse(courtesy_expires_at as string))) {
+        res.status(400).json({ error: 'courtesy_expires_at debe ser una fecha válida' });
+        return;
+      }
+      data.courtesy_expires_at = courtesy_expires_at as string | null;
+    }
+
+    if (data.is_courtesy === true) {
+      if (!data.courtesy_plan) {
+        res.status(400).json({ error: 'courtesy_plan es requerido para activar la cortesía' });
+        return;
+      }
+      if (!data.courtesy_expires_at) {
+        res.status(400).json({ error: 'courtesy_expires_at es requerido para activar la cortesía' });
+        return;
+      }
+    }
+
+    // Al desactivar cortesía sin especificar plan, limpiarlo — mismo comportamiento que la revocación automática.
+    if (data.is_courtesy === false && data.courtesy_plan === undefined) {
+      data.courtesy_plan = null;
+    }
+
+    await adminService.updateCourtesy(req.params.id, data);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+}

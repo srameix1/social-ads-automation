@@ -108,25 +108,30 @@ export async function createPost(
     is_trial:           boolean;
     trial_posts_used:   number;
     trial_posts_limit:  number;
+    courtesy_active:    boolean;
   }>(
     `SELECT campaigns.id, campaigns.max_posts,
        (SELECT COUNT(*)::int FROM posts WHERE campaign_id = campaigns.id) AS posts_used,
-       cp.is_trial, cp.posts_used AS trial_posts_used, cp.trial_posts_limit
+       cp.is_trial, cp.posts_used AS trial_posts_used, cp.trial_posts_limit,
+       (cp.is_courtesy AND cp.courtesy_expires_at > NOW()) AS courtesy_active
      FROM campaigns
      JOIN client_profiles cp ON cp.user_id = campaigns.client_id
      WHERE campaigns.id = $1 AND campaigns.client_id = $2`,
     [campaignId, clientId],
   );
   if (!cam) throw createError('Campaña no encontrada', 404);
-  if (parseInt(cam.posts_used) >= cam.max_posts) {
-    throw createError(`Has alcanzado el límite de tu plan (${cam.max_posts}/${cam.max_posts})`, 403);
-  }
-  if (cam.is_trial && cam.trial_posts_used >= cam.trial_posts_limit) {
-    throw createError(
-      `Has alcanzado el límite de tu período de prueba (${cam.trial_posts_used}/${cam.trial_posts_limit})`,
-      403,
-      'TRIAL_LIMIT_REACHED',
-    );
+  // Cortesía activa: acceso completo sin límite de posts, salta ambos topes.
+  if (!cam.courtesy_active) {
+    if (parseInt(cam.posts_used) >= cam.max_posts) {
+      throw createError(`Has alcanzado el límite de tu plan (${cam.max_posts}/${cam.max_posts})`, 403);
+    }
+    if (cam.is_trial && cam.trial_posts_used >= cam.trial_posts_limit) {
+      throw createError(
+        `Has alcanzado el límite de tu período de prueba (${cam.trial_posts_used}/${cam.trial_posts_limit})`,
+        403,
+        'TRIAL_LIMIT_REACHED',
+      );
+    }
   }
 
   if (!data.platforms?.length) throw createError('Selecciona al menos una plataforma', 400);

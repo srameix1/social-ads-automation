@@ -12,6 +12,7 @@ router.get('/stats',                  controller.stats);
 router.get('/clients',                controller.listClients);
 router.get('/clients/:id',            controller.getClient);
 router.patch('/clients/:id',          controller.updateClient);
+router.patch('/clients/:id/courtesy', controller.updateCourtesy);
 router.get('/campaigns',              controller.listCampaigns);
 router.get('/campaigns/:id',          controller.getCampaign);
 router.patch('/campaigns/:id/max-posts', controller.updateCampaignMaxPosts);

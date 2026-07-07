@@ -29,11 +29,13 @@ export async function getAllClients() {
     is_trial: boolean; trial_posts_limit: number; posts_used: number;
     admin_notes: string | null; registration_ip: string | null;
     duplicate_ip: boolean;
+    is_courtesy: boolean; courtesy_plan: string | null; courtesy_expires_at: string | null;
   }>(`
     SELECT u.id, u.email, u.is_active, u.created_at,
            cp.business_name, cp.setup_completed, cp.plan,
            cp.is_trial, cp.trial_posts_limit, cp.posts_used,
            cp.admin_notes, cp.registration_ip,
+           cp.is_courtesy, cp.courtesy_plan, cp.courtesy_expires_at,
            COUNT(c.id) AS campaign_count,
            CASE
              WHEN cp.registration_ip IS NOT NULL
@@ -47,7 +49,8 @@ export async function getAllClients() {
     GROUP BY u.id, u.email, u.is_active, u.created_at,
              cp.business_name, cp.setup_completed, cp.plan,
              cp.is_trial, cp.trial_posts_limit, cp.posts_used,
-             cp.admin_notes, cp.registration_ip
+             cp.admin_notes, cp.registration_ip,
+             cp.is_courtesy, cp.courtesy_plan, cp.courtesy_expires_at
     ORDER BY u.created_at DESC
   `);
 }
@@ -185,4 +188,31 @@ export async function updateCampaignMaxPosts(campaignId: string, maxPosts: numbe
     [maxPosts, campaignId],
   );
   if (!result.length) throw createError('Campaña no encontrada', 404);
+}
+
+// ── Cortesía ─────────────────────────────────────────────────────────────────
+
+export interface CourtesyUpdate {
+  is_courtesy?:         boolean;
+  courtesy_plan?:       string | null;
+  courtesy_expires_at?: string | null;
+}
+
+export async function updateCourtesy(userId: string, data: CourtesyUpdate): Promise<void> {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  let i = 1;
+
+  if (data.is_courtesy         !== undefined) { fields.push(`is_courtesy = $${i++}`);         values.push(data.is_courtesy); }
+  if (data.courtesy_plan       !== undefined) { fields.push(`courtesy_plan = $${i++}`);        values.push(data.courtesy_plan); }
+  if (data.courtesy_expires_at !== undefined) { fields.push(`courtesy_expires_at = $${i++}`);  values.push(data.courtesy_expires_at); }
+
+  if (!fields.length) throw createError('Nada que actualizar', 400);
+
+  values.push(userId);
+  const result = await query<{ user_id: string }>(
+    `UPDATE client_profiles SET ${fields.join(', ')} WHERE user_id = $${i} RETURNING user_id`,
+    values,
+  );
+  if (!result.length) throw createError('Cliente no encontrado', 404);
 }

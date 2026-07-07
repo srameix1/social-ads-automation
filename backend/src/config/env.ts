@@ -67,4 +67,8 @@ export const env = {
   STRIPE_PRICE_BASIC:        optional('STRIPE_PRICE_BASIC', ''),
   STRIPE_PRICE_PROFESSIONAL: optional('STRIPE_PRICE_PROFESSIONAL', ''),
   STRIPE_PRICE_PREMIUM:      optional('STRIPE_PRICE_PREMIUM', ''),
+
+  // Telegram (alertas de cortesía)
+  TELEGRAM_BOT_TOKEN: optional('TELEGRAM_BOT_TOKEN', ''),
+  TELEGRAM_CHAT_ID:   optional('TELEGRAM_CHAT_ID', ''),
 } as const;

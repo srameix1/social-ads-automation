@@ -106,16 +106,23 @@ export async function createCampaign(
   return campaign;
 }
 
+// Sentinel used as "sin límite" for clientes en cortesía activa —
+// max_posts es INTEGER NOT NULL en campaigns, no admite NULL como "ilimitado".
+const UNLIMITED_POSTS = 999999;
+
 async function getMaxPostsForClient(clientId: string): Promise<number> {
   try {
-    const rows = await query<{ max_posts_per_campaign: number }>(
-      `SELECT pl.max_posts_per_campaign
+    const rows = await query<{ max_posts_per_campaign: number; courtesy_active: boolean }>(
+      `SELECT pl.max_posts_per_campaign,
+              (cp.is_courtesy AND cp.courtesy_expires_at > NOW()) AS courtesy_active
        FROM plan_limits pl
        JOIN client_profiles cp ON cp.plan = pl.plan
        WHERE cp.user_id = $1`,
       [clientId],
     );
-    return rows[0]?.max_posts_per_campaign ?? 20;
+    const row = rows[0];
+    if (!row) return 20;
+    return row.courtesy_active ? UNLIMITED_POSTS : row.max_posts_per_campaign;
   } catch {
     return 20;
   }

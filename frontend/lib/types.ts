@@ -85,6 +85,9 @@ export interface AdminClientRow {
   admin_notes:       string | null;
   registration_ip:   string | null;
   duplicate_ip:      boolean;
+  is_courtesy:         boolean;
+  courtesy_plan:       ServicePlan | null;
+  courtesy_expires_at: string | null;
 }
 
 export interface CredentialStatus {

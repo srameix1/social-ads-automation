@@ -20,6 +20,13 @@ export function ClientsTable({ clients, onClientUpdated }: Props) {
   const [notesInput,     setNotesInput]     = useState('');
   const [savingNotes,    setSavingNotes]    = useState(false);
 
+  const [editingCourtesyId, setEditingCourtesyId] = useState<string | null>(null);
+  const [courtesyOn,        setCourtesyOn]        = useState(false);
+  const [courtesyPlan,      setCourtesyPlan]      = useState<AdminClientRow['plan']>('basic');
+  const [courtesyDate,      setCourtesyDate]      = useState('');
+  const [savingCourtesy,    setSavingCourtesy]    = useState(false);
+  const [courtesyError,     setCourtesyError]     = useState<string | null>(null);
+
   const adjustLimit = async (c: AdminClientRow, delta: number) => {
     const next = Math.max(0, c.trial_posts_limit + delta);
     setSavingLimit(true);
@@ -55,6 +62,42 @@ export function ClientsTable({ clients, onClientUpdated }: Props) {
     }
   };
 
+  const openCourtesyEditor = (c: AdminClientRow) => {
+    setEditingCourtesyId(c.id);
+    setCourtesyOn(c.is_courtesy);
+    setCourtesyPlan(c.courtesy_plan ?? 'basic');
+    setCourtesyDate(c.courtesy_expires_at ? c.courtesy_expires_at.slice(0, 10) : '');
+    setCourtesyError(null);
+  };
+
+  const saveCourtesy = async (c: AdminClientRow) => {
+    setCourtesyError(null);
+    if (courtesyOn && !courtesyDate) {
+      setCourtesyError('La fecha de expiración es requerida');
+      return;
+    }
+    setSavingCourtesy(true);
+    try {
+      const expiresAt = courtesyDate ? new Date(`${courtesyDate}T23:59:59`).toISOString() : null;
+      await adminApi.updateCourtesy(c.id, {
+        is_courtesy:         courtesyOn,
+        courtesy_plan:       courtesyOn ? courtesyPlan : null,
+        courtesy_expires_at: courtesyOn ? expiresAt : null,
+      });
+      onClientUpdated({
+        ...c,
+        is_courtesy:         courtesyOn,
+        courtesy_plan:       courtesyOn ? courtesyPlan : null,
+        courtesy_expires_at: courtesyOn ? expiresAt : null,
+      });
+      setEditingCourtesyId(null);
+    } catch (e) {
+      setCourtesyError((e as Error).message);
+    } finally {
+      setSavingCourtesy(false);
+    }
+  };
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -64,6 +107,7 @@ export function ClientsTable({ clients, onClientUpdated }: Props) {
             <th className="text-left py-3 px-4 font-medium text-gray-500">Negocio</th>
             <th className="text-left py-3 px-4 font-medium text-gray-500">Perfil</th>
             <th className="text-left py-3 px-4 font-medium text-gray-500">Trial (posts usados/límite)</th>
+            <th className="text-left py-3 px-4 font-medium text-gray-500">Cortesía</th>
             <th className="text-left py-3 px-4 font-medium text-gray-500">Notas admin</th>
             <th className="text-left py-3 px-4 font-medium text-gray-500">Campañas</th>
             <th className="text-left py-3 px-4 font-medium text-gray-500">Registro</th>
@@ -143,6 +187,68 @@ export function ClientsTable({ clients, onClientUpdated }: Props) {
                     </div>
                   ) : (
                     <span className="text-gray-400 text-xs">Plan pago</span>
+                  )}
+                </td>
+                <td className="py-3 px-4 min-w-[190px]">
+                  {editingCourtesyId === c.id ? (
+                    <div className="flex flex-col gap-1.5">
+                      <label className="flex items-center gap-1.5 text-xs text-gray-600">
+                        <input
+                          type="checkbox"
+                          checked={courtesyOn}
+                          onChange={e => setCourtesyOn(e.target.checked)}
+                        />
+                        Cortesía activa
+                      </label>
+                      <select
+                        value={courtesyPlan}
+                        disabled={!courtesyOn}
+                        onChange={e => setCourtesyPlan(e.target.value as AdminClientRow['plan'])}
+                        className="border border-gray-300 rounded px-1.5 py-1 text-xs disabled:opacity-50"
+                      >
+                        <option value="basic">Basic</option>
+                        <option value="professional">Professional</option>
+                        <option value="premium">Premium</option>
+                      </select>
+                      <input
+                        type="date"
+                        value={courtesyDate}
+                        disabled={!courtesyOn}
+                        onChange={e => setCourtesyDate(e.target.value)}
+                        className="border border-gray-300 rounded px-1.5 py-1 text-xs disabled:opacity-50"
+                      />
+                      {courtesyError && <p className="text-xs text-red-500">{courtesyError}</p>}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => saveCourtesy(c)}
+                          disabled={savingCourtesy}
+                          className="text-xs text-brand-600 hover:text-brand-700 disabled:opacity-50"
+                        >
+                          OK
+                        </button>
+                        <button
+                          onClick={() => setEditingCourtesyId(null)}
+                          className="text-xs text-gray-400 hover:text-gray-600"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => openCourtesyEditor(c)} className="text-left">
+                      {c.is_courtesy ? (
+                        <div className="flex flex-col gap-0.5">
+                          <Badge variant="green">{c.courtesy_plan}</Badge>
+                          {c.courtesy_expires_at && (
+                            <span className="text-xs text-gray-500">
+                              hasta {new Date(c.courtesy_expires_at).toLocaleDateString('es-MX')}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400 underline decoration-dotted">Sin cortesía</span>
+                      )}
+                    </button>
                   )}
                 </td>
                 <td className="py-3 px-4 max-w-[220px]">
