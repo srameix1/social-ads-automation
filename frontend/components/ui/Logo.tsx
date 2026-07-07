@@ -125,8 +125,8 @@ export function SanaddsHero({ className = '' }: { className?: string }) {
 
       <div className="text-center">
         <div className="text-[3.25rem] font-black tracking-tight leading-none select-none">
-          <span className="text-violet-300">SAN</span>
-          <span className="text-white">ADS</span>
+          <span className="text-violet-300">Spot</span>
+          <span className="text-white">Flow</span>
         </div>
         <p className="mt-2.5 text-[10px] font-semibold tracking-[0.32em] uppercase text-slate-500">
           AI Social Advertising
