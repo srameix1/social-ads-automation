@@ -201,13 +201,6 @@ export async function handleWebhook(rawBody: Buffer, signature: string): Promise
     case 'customer.subscription.updated': {
       const sub    = event.data.object as StripeSubscription;
       const userId = sub.metadata?.userId;
-      // TEMP DEBUG: payload crudo para diagnosticar bug de cancel_at_period_end — remover tras confirmar
-      logger.info('TEMP DEBUG customer.subscription.updated raw payload', {
-        id: sub.id,
-        status: sub.status,
-        cancel_at_period_end: sub.cancel_at_period_end,
-        raw: event.data.object,
-      });
       if (!userId) break;
 
       const status = sub.status === 'active'   ? 'active'
