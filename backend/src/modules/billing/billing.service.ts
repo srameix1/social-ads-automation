@@ -148,6 +148,7 @@ interface StripeSubscription {
   status:                string;
   metadata:              Record<string, string>;
   cancel_at_period_end:  boolean;
+  cancel_at:             number | null;
 }
 interface StripeInvoice {
   customer: string | null;
@@ -208,15 +209,20 @@ export async function handleWebhook(rawBody: Buffer, signature: string): Promise
                    : sub.status === 'canceled'  ? 'cancelled'
                    : sub.status;
 
+      // Stripe no siempre marca cancel_at_period_end=true al cancelar desde el
+      // Customer Portal — a veces solo setea cancel_at (timestamp de fin de período).
+      // Tratamos ambas señales como cancelación programada.
+      const cancelAtPeriodEnd = Boolean(sub.cancel_at_period_end) || (typeof sub.cancel_at === 'number' && sub.cancel_at > 0);
+
       await query(
         `UPDATE client_profiles
          SET subscription_status = $1, cancel_at_period_end = $2, updated_at = NOW()
          WHERE user_id = $3`,
-        [status, sub.cancel_at_period_end ?? false, userId],
+        [status, cancelAtPeriodEnd, userId],
       );
       const plan = sub.metadata?.plan;
       if (plan) await query('UPDATE client_profiles SET plan = $1 WHERE user_id = $2', [plan, userId]);
-      logger.info('Suscripción actualizada', { userId, status, cancelAtPeriodEnd: sub.cancel_at_period_end });
+      logger.info('Suscripción actualizada', { userId, status, cancelAtPeriodEnd });
       break;
     }
 
