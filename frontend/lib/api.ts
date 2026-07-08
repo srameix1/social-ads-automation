@@ -279,6 +279,8 @@ export const billing = {
     request<{ url: string }>('/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
   createPortal: () =>
     request<{ url: string }>('/billing/portal', { method: 'POST' }),
+  cancelSubscription: () =>
+    request<{ success: boolean; currentPeriodEnd: string | null }>('/billing/cancel', { method: 'POST' }),
 };
 
 // ── Visual Variations (legacy) ─────────────────────────────────────────────

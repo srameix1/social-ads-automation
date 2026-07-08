@@ -27,6 +27,8 @@ export interface ClientProfile {
   posts_used:                    number;
   admin_notes:                   string | null;
   registration_ip:               string | null;
+  pending_plan:                  ServicePlan | null;
+  cancel_at_period_end:          boolean;
   created_at:                    string;
   updated_at:                    string;
 }
@@ -119,13 +121,13 @@ export async function getAllClients() {
 }
 
 export async function selectPlan(userId: string, plan: ServicePlan): Promise<ClientProfile> {
-  // Converting out of trial (or picking a plan for the first time) always
-  // clears is_trial and delivery_mode, so the normal onboarding gate sends
-  // the client to /delivery-mode next — trial's 'manual' default was only
-  // a bypass, not a real choice.
+  // Solo registra la intención — NO activa el plan todavía. El cliente
+  // sigue en su estado actual (trial u otro) hasta que el webhook de Stripe
+  // (checkout.session.completed) confirme el pago y active plan/is_trial/
+  // delivery_mode. Ver billing.service.ts::handleWebhook.
   const profile = await queryOne<ClientProfile>(
     `UPDATE client_profiles
-     SET plan = $1, plan_selected_at = NOW(), is_trial = FALSE, delivery_mode = NULL
+     SET pending_plan = $1
      WHERE user_id = $2 RETURNING *`,
     [plan, userId],
   );

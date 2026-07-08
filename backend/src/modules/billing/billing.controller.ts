@@ -3,6 +3,7 @@ import {
   createCheckoutSession,
   createPortalSession,
   getSubscriptionStatus,
+  cancelSubscription,
   handleWebhook,
 } from './billing.service';
 
@@ -27,6 +28,13 @@ export const billingController = {
     try {
       const url = await createPortalSession(req.user!.userId);
       res.json({ url });
+    } catch (err) { next(err); }
+  },
+
+  async cancelSubscription(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await cancelSubscription(req.user!.userId);
+      res.json({ success: true, ...result });
     } catch (err) { next(err); }
   },
 

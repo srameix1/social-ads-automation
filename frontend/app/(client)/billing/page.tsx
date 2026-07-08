@@ -64,6 +64,22 @@ export default function BillingPage() {
     }
   }
 
+  async function handleCancelSubscription() {
+    if (!window.confirm('¿Cancelar tu suscripción? Seguirás teniendo acceso hasta el fin del período que ya pagaste, y no se te volverá a cobrar.')) {
+      return;
+    }
+    setActionBusy('cancel');
+    try {
+      const { currentPeriodEnd } = await billing.cancelSubscription();
+      setStatus(prev => prev && { ...prev, cancelAtPeriodEnd: true, currentPeriodEnd: currentPeriodEnd ?? prev.currentPeriodEnd });
+      setNotification({ type: 'success', message: 'Tu suscripción se cancelará al final del período actual.' });
+    } catch (err: any) {
+      setNotification({ type: 'error', message: err.message });
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
   const isActive = status?.status === 'active';
   const currentPlan = status?.plan ?? 'basic';
 
@@ -91,9 +107,14 @@ export default function BillingPage() {
             <div>
               <p className="text-xs text-slate-500 mb-1">Plan actual</p>
               <p className="text-lg font-bold text-white">{PLAN_DETAILS[currentPlan].name}</p>
-              {status.currentPeriodEnd && (
+              {status.currentPeriodEnd && !status.cancelAtPeriodEnd && (
                 <p className="text-xs text-slate-500 mt-1">
                   Próxima renovación: {new Date(status.currentPeriodEnd).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+              )}
+              {status.cancelAtPeriodEnd && (
+                <p className="text-xs text-amber-400 mt-1">
+                  Se cancelará{status.currentPeriodEnd ? ` el ${new Date(status.currentPeriodEnd).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''} — no se renovará.
                 </p>
               )}
             </div>
@@ -113,6 +134,15 @@ export default function BillingPage() {
                   className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-600 text-slate-300 hover:bg-white/5 transition-colors disabled:opacity-50"
                 >
                   {actionBusy === 'portal' ? 'Redirigiendo…' : 'Gestionar suscripción'}
+                </button>
+              )}
+              {isActive && !status.cancelAtPeriodEnd && (
+                <button
+                  onClick={handleCancelSubscription}
+                  disabled={!!actionBusy}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                >
+                  {actionBusy === 'cancel' ? 'Cancelando…' : 'Cancelar suscripción'}
                 </button>
               )}
             </div>

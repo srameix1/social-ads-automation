@@ -213,8 +213,10 @@ export interface Publication {
 }
 
 export interface SubscriptionStatus {
-  plan:             ServicePlan;
-  status:           'inactive' | 'active' | 'past_due' | 'cancelled';
-  subscriptionId:   string | null;
-  currentPeriodEnd: string | null;
+  plan:              ServicePlan;
+  status:            'inactive' | 'active' | 'past_due' | 'cancelled';
+  subscriptionId:    string | null;
+  currentPeriodEnd:  string | null;
+  cancelAtPeriodEnd: boolean;
+  pendingPlan:       ServicePlan | null;
 }

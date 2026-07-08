@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { env } from '../../config/env';
 import { query, queryOne } from '../../config/database';
 import { logger } from '../../utils/logger';
+import { createError } from '../../middleware/errorHandler';
 
 const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
@@ -72,13 +73,18 @@ export async function getSubscriptionStatus(userId: string): Promise<{
   status:             string;
   subscriptionId:     string | null;
   currentPeriodEnd:   string | null;
+  cancelAtPeriodEnd:  boolean;
+  pendingPlan:        string | null;
 }> {
   const row = await queryOne<{
     plan:                   string;
     stripe_subscription_id: string | null;
     subscription_status:    string;
+    cancel_at_period_end:   boolean;
+    pending_plan:           string | null;
   }>(
-    `SELECT cp.plan, cp.stripe_subscription_id, cp.subscription_status
+    `SELECT cp.plan, cp.stripe_subscription_id, cp.subscription_status,
+            cp.cancel_at_period_end, cp.pending_plan
      FROM client_profiles cp WHERE cp.user_id = $1`,
     [userId],
   );
@@ -96,11 +102,37 @@ export async function getSubscriptionStatus(userId: string): Promise<{
   }
 
   return {
-    plan:             row?.plan ?? 'basic',
-    status:           row?.subscription_status ?? 'inactive',
-    subscriptionId:   row?.stripe_subscription_id ?? null,
+    plan:              row?.plan ?? 'basic',
+    status:            row?.subscription_status ?? 'inactive',
+    subscriptionId:    row?.stripe_subscription_id ?? null,
+    cancelAtPeriodEnd: row?.cancel_at_period_end ?? false,
+    pendingPlan:       row?.pending_plan ?? null,
     currentPeriodEnd,
   };
+}
+
+export async function cancelSubscription(userId: string): Promise<{ currentPeriodEnd: string | null }> {
+  const row = await queryOne<{ stripe_subscription_id: string | null }>(
+    'SELECT stripe_subscription_id FROM client_profiles WHERE user_id = $1',
+    [userId],
+  );
+  if (!row?.stripe_subscription_id) {
+    throw createError('No hay suscripción activa para cancelar.', 400);
+  }
+
+  const sub = await stripe.subscriptions.update(row.stripe_subscription_id, {
+    cancel_at_period_end: true,
+  });
+
+  await query(
+    'UPDATE client_profiles SET cancel_at_period_end = TRUE, updated_at = NOW() WHERE user_id = $1',
+    [userId],
+  );
+
+  logger.info('Suscripción marcada para cancelar al fin del período', { userId, subscriptionId: row.stripe_subscription_id });
+
+  const end = (sub as any).current_period_end;
+  return { currentPeriodEnd: typeof end === 'number' ? new Date(end * 1000).toISOString() : null };
 }
 
 // Inline types to avoid Stripe namespace resolution issues with CommonJS
@@ -109,11 +141,13 @@ interface StripeCheckoutSession {
   client_reference_id:  string | null;
   metadata:             Record<string, string> | null;
   subscription:         string | null;
+  payment_status:       string;
 }
 interface StripeSubscription {
-  id:       string;
-  status:   string;
-  metadata: Record<string, string>;
+  id:                    string;
+  status:                string;
+  metadata:              Record<string, string>;
+  cancel_at_period_end:  boolean;
 }
 interface StripeInvoice {
   customer: string | null;
@@ -125,6 +159,7 @@ export async function handleWebhook(rawBody: Buffer, signature: string): Promise
   try {
     event = stripe.webhooks.constructEvent(rawBody, signature, env.STRIPE_WEBHOOK_SECRET);
   } catch (err: any) {
+    logger.error('Stripe webhook signature verification failed', { error: err.message });
     throw new Error(`Stripe webhook signature failed: ${err.message}`);
   }
 
@@ -136,15 +171,30 @@ export async function handleWebhook(rawBody: Buffer, signature: string): Promise
       const userId  = session.client_reference_id ?? session.metadata?.userId;
       const plan    = session.metadata?.plan;
       const subId   = session.subscription;
-      if (!userId || !plan) { logger.warn('checkout.session.completed: missing metadata', { id: session.id }); break; }
 
+      if (!userId || !plan) {
+        logger.warn('checkout.session.completed: missing metadata — plan NOT activated', { id: session.id, userId, plan });
+        break;
+      }
+      if (session.payment_status !== 'paid') {
+        logger.warn('checkout.session.completed: payment_status no es "paid" — plan NOT activated', {
+          id: session.id, userId, plan, paymentStatus: session.payment_status,
+        });
+        break;
+      }
+
+      // Activación real del plan pagado — is_trial/delivery_mode se resetean
+      // igual que antes lo hacía selectPlan(), solo que ahora gated en el
+      // pago confirmado en vez de en la sola elección del plan.
       await query(
         `UPDATE client_profiles
-         SET plan = $1, stripe_subscription_id = $2, subscription_status = 'active', updated_at = NOW()
+         SET plan = $1, plan_selected_at = NOW(), is_trial = FALSE, delivery_mode = NULL,
+             pending_plan = NULL, cancel_at_period_end = FALSE,
+             stripe_subscription_id = $2, subscription_status = 'active', updated_at = NOW()
          WHERE user_id = $3`,
         [plan, subId, userId],
       );
-      logger.info('Plan activated via Stripe checkout', { userId, plan, subId });
+      logger.info('Plan activado vía Stripe checkout confirmado', { userId, plan, subId, sessionId: session.id });
       break;
     }
 
@@ -159,11 +209,14 @@ export async function handleWebhook(rawBody: Buffer, signature: string): Promise
                    : sub.status;
 
       await query(
-        `UPDATE client_profiles SET subscription_status = $1, updated_at = NOW() WHERE user_id = $2`,
-        [status, userId],
+        `UPDATE client_profiles
+         SET subscription_status = $1, cancel_at_period_end = $2, updated_at = NOW()
+         WHERE user_id = $3`,
+        [status, sub.cancel_at_period_end ?? false, userId],
       );
       const plan = sub.metadata?.plan;
       if (plan) await query('UPDATE client_profiles SET plan = $1 WHERE user_id = $2', [plan, userId]);
+      logger.info('Suscripción actualizada', { userId, status, cancelAtPeriodEnd: sub.cancel_at_period_end });
       break;
     }
 
@@ -174,11 +227,12 @@ export async function handleWebhook(rawBody: Buffer, signature: string): Promise
 
       await query(
         `UPDATE client_profiles
-         SET subscription_status = 'cancelled', stripe_subscription_id = NULL, updated_at = NOW()
+         SET subscription_status = 'cancelled', stripe_subscription_id = NULL,
+             cancel_at_period_end = FALSE, updated_at = NOW()
          WHERE user_id = $1`,
         [userId],
       );
-      logger.info('Subscription cancelled', { userId });
+      logger.info('Suscripción cancelada (fin de período alcanzado)', { userId });
       break;
     }
 
