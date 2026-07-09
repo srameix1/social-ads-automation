@@ -221,14 +221,14 @@ export async function publishVariation(
 
 // ── Social media publishing ────────────────────────────────────────────────
 
-async function publishToSocialMedia(
+export async function publishToSocialMedia(
   platform:     string,
   clientId:     string,
   mediaUrl:     string,
   caption:      string,
   campaignId:   string,
   strategyId:   string,
-  mediaAssetId: string,
+  mediaAssetId: string | null,
 ): Promise<void> {
   let postId = '', postUrl = '';
   try {
