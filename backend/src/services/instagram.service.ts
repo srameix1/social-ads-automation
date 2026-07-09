@@ -21,6 +21,24 @@ export interface PublishResult {
   postUrl: string;
 }
 
+async function waitForContainerReady(
+  baseUrl:      string,
+  creationId:   string,
+  access_token: string,
+): Promise<void> {
+  const maxAttempts = 24; // ~2 minutos con 5s de espera
+  for (let i = 0; i < maxAttempts; i++) {
+    const res  = await fetch(`${baseUrl}/${creationId}?fields=status_code&access_token=${access_token}`);
+    const data = await res.json() as { status_code?: string };
+    if (data.status_code === 'FINISHED') return;
+    if (data.status_code === 'ERROR') {
+      throw new Error(`Instagram container processing failed: ${JSON.stringify(data)}`);
+    }
+    await new Promise(r => setTimeout(r, 5000));
+  }
+  throw new Error('Instagram container timeout esperando FINISHED (2 min)');
+}
+
 export async function publishToInstagram(
   credentials: InstagramCredentials,
   mediaUrl:    string,
@@ -28,16 +46,26 @@ export async function publishToInstagram(
 ): Promise<PublishResult> {
   const { access_token, instagram_account_id } = credentials;
   const baseUrl = `${GRAPH_URL}/${instagram_account_id}`;
+  const isVideo = /\.(mp4|mov)$/i.test(mediaUrl);
 
   // Paso 1: Crear container de media
   const containerRes = await fetch(`${baseUrl}/media`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      image_url:    mediaUrl,
-      caption:      caption,
-      access_token: access_token,
-    }),
+    body: JSON.stringify(
+      isVideo
+        ? {
+            media_type:   'REELS',
+            video_url:    mediaUrl,
+            caption:      caption,
+            access_token: access_token,
+          }
+        : {
+            image_url:    mediaUrl,
+            caption:      caption,
+            access_token: access_token,
+          },
+    ),
   });
 
   if (!containerRes.ok) {
@@ -47,6 +75,12 @@ export async function publishToInstagram(
 
   const { id: creationId } = await containerRes.json() as { id: string };
   logger.debug('[Instagram] Container creado:', creationId);
+
+  if (isVideo) {
+    logger.info(`[Instagram] Esperando procesamiento del container: ${creationId}`);
+    await waitForContainerReady(baseUrl, creationId, access_token);
+    logger.info(`[Instagram] Container listo, publicando: ${creationId}`);
+  }
 
   // Paso 2: Publicar el container
   const publishRes = await fetch(`${baseUrl}/media_publish`, {

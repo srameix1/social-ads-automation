@@ -232,15 +232,19 @@ export async function publishToSocialMedia(
 ): Promise<void> {
   let postId = '', postUrl = '';
   try {
+    const absoluteMediaUrl = mediaUrl.startsWith('/')
+      ? `${env.BACKEND_URL}${mediaUrl}`
+      : mediaUrl;
+
     const creds = await getDecryptedCredentials(clientId, platform as 'instagram' | 'tiktok' | 'facebook');
     if (platform === 'instagram') {
-      const r = await publishToInstagram(creds as unknown as Parameters<typeof publishToInstagram>[0], mediaUrl, caption);
+      const r = await publishToInstagram(creds as unknown as Parameters<typeof publishToInstagram>[0], absoluteMediaUrl, caption);
       postId = r.postId; postUrl = r.postUrl;
     } else if (platform === 'tiktok') {
-      const r = await publishToTikTok(creds as unknown as Parameters<typeof publishToTikTok>[0], mediaUrl, caption);
+      const r = await publishToTikTok(creds as unknown as Parameters<typeof publishToTikTok>[0], absoluteMediaUrl, caption);
       postId = r.postId; postUrl = r.postUrl;
     } else if (platform === 'facebook') {
-      const r = await publishToFacebook(creds as unknown as Parameters<typeof publishToFacebook>[0], mediaUrl, caption);
+      const r = await publishToFacebook(creds as unknown as Parameters<typeof publishToFacebook>[0], absoluteMediaUrl, caption);
       postId = r.postId; postUrl = r.postUrl;
     }
     await query(

@@ -27,17 +27,27 @@ export async function publishToFacebook(
   caption:     string,
 ): Promise<PublishResult> {
   const { page_access_token, page_id } = credentials;
+  const isVideo = /\.(mp4|mov)$/i.test(mediaUrl);
 
-  // Publicar imagen con mensaje
-  const res = await fetch(`${GRAPH_URL}/${page_id}/photos`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      url:          mediaUrl,
-      message:      caption,
-      access_token: page_access_token,
-    }),
-  });
+  const res = isVideo
+    ? await fetch(`${GRAPH_URL}/${page_id}/videos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file_url:     mediaUrl,
+          description:  caption,
+          access_token: page_access_token,
+        }),
+      })
+    : await fetch(`${GRAPH_URL}/${page_id}/photos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url:          mediaUrl,
+          message:      caption,
+          access_token: page_access_token,
+        }),
+      });
 
   if (!res.ok) {
     const err = await res.json() as { error?: { message: string } };
