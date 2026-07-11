@@ -5,6 +5,7 @@ import {
   generateVisualVariations,
   generateVisualVariationsFromPhotos,
   generateProfessionalVideosFromImage,
+  generatePremiumVideoFromImage,
   generatePremiumReelFromImage,
   ContentInput,
 } from '../../services/contentGeneration.service';
@@ -121,7 +122,12 @@ export async function generateVideoForSelectedVariation(
       const contentInput = await buildContentInputForPost(postId, variationId);
       const { feed } = await generateProfessionalVideosFromImage(imagePath, outputDir, contentInput ?? undefined);
       videoUrl = filePathToUrl(feed);
+    } else if (format === 'reel') {
+      const contentInput = await buildContentInputForPost(postId, variationId);
+      const { video } = await generatePremiumVideoFromImage(imagePath, outputDir, contentInput ?? undefined);
+      videoUrl = filePathToUrl(video);
     } else {
+      // Safety fallback for any unexpected format value — mixed reel (proven, still in use elsewhere)
       const contentInput = await buildContentInputForPost(postId, variationId);
       const { reel } = await generatePremiumReelFromImage(imagePath, outputDir, contentInput ?? undefined);
       videoUrl = filePathToUrl(reel);

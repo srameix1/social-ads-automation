@@ -614,6 +614,117 @@ async function _runPremiumReelFromImage(
   return { reel: reelOut };
 }
 
+// ── Plan Premium: real video from start to finish (no Ken Burns / closing card) ─
+//
+// 3 clips (~7s each), all AI-generated, anchored to the SAME base image/scene
+// for continuity, each with a different camera movement (push-in / static
+// detail / pull-back), joined with a soft crossfade. Same per-clip fallback
+// chain as the mixed reel: Grok (KIE.ai) → Kling 3.0 → Veo 2 → Ken Burns as
+// last resort. No closing card — logo/copy are applied afterward via
+// applyVideoOverlays.
+
+const VIDEO_TIMEOUT_MS          = 8 * 60 * 1000; // 8 minutes hard ceiling, same as reel
+const VIDEO_CLIP_DURATION       = 7;              // seconds per clip — must be uniform for xfade offset math
+const VIDEO_TRANSITION_DURATION = 0.5;             // seconds
+
+const CAMERA_DIRECTIONS = [
+  'CAMERA DIRECTION: slow, smooth push-in (dolly forward) toward the main subject, gradually revealing detail. Steady, cinematic pace, no cuts.',
+  'CAMERA DIRECTION: static or nearly static close-up detail shot, minimal camera movement, sharp focus on texture and detail.',
+  'CAMERA DIRECTION: slow pull-back (dolly out) revealing the full scene and surrounding context. Steady, cinematic pace, no cuts.',
+];
+
+export async function generatePremiumVideoFromImage(
+  imagePath: string,
+  outputDir: string,
+  input?:    ContentInput,
+): Promise<{ video: string }> {
+  const timeoutGuard = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error('[Timeout] generatePremiumVideoFromImage exceeded 8 minutes — process cancelled')),
+      VIDEO_TIMEOUT_MS,
+    ),
+  );
+  return Promise.race([_runPremiumVideoFromImage(imagePath, outputDir, input), timeoutGuard]);
+}
+
+async function _runPremiumVideoFromImage(
+  imagePath: string,
+  outputDir: string,
+  input?:    ContentInput,
+): Promise<{ video: string }> {
+  fs.mkdirSync(outputDir, { recursive: true });
+
+  logger.info(`[ContentGen] generatePremiumVideoFromImage — visualConcept: "${input?.visualConcept?.slice(0, 300) ?? '*** EMPTY/UNDEFINED ***'}"`);
+  logger.info(`[ContentGen] generatePremiumVideoFromImage — businessName: "${input?.businessName ?? '*** EMPTY ***'}"`);
+  logger.info(`[ContentGen] generatePremiumVideoFromImage — copyText: "${input?.copyText?.slice(0, 120) ?? '*** EMPTY ***'}"`);
+
+  const videoOut    = path.join(outputDir, 'premium_video.mp4');
+  const audio       = path.join(outputDir, '_tmp_video_audio.mp3');
+  const baseImgPath = path.join(outputDir, '_tmp_video_base.jpg');
+
+  // ── Single clean base image, reused across all 3 clips for scene continuity ─
+  logger.info('[ContentGen] Video — base image: Gemini clean scene…');
+  let baseImgReady = false;
+  if (input?.visualConcept) {
+    try {
+      const bgBuffer = await generateCleanBrandImage(input, 1080, 1920);
+      fs.writeFileSync(baseImgPath, bgBuffer);
+      baseImgReady = true;
+    } catch (err) {
+      logger.warn(`[ContentGen] Video — base image Gemini failed, using selected image: ${(err as Error).message}`);
+    }
+  }
+  if (!baseImgReady) {
+    await sharp(imagePath)
+      .resize(1080, 1920, { fit: 'cover', position: 'centre' })
+      .jpeg({ quality: 92 })
+      .toFile(baseImgPath);
+  }
+
+  // ── 3 clips (~7s each), same base image/scene, distinct camera movement ────
+  const clips: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    if (input?.visualConcept) {
+      const clipInput: ContentInput = {
+        ...input,
+        visualConcept: `${input.visualConcept}. ${CAMERA_DIRECTIONS[i]}`,
+      };
+      logger.info(`[ContentGen] Video — clip ${i + 1}/3: Grok → Kling 3.0 → Veo 2 → Ken Burns…`);
+      clips.push(await generatePremiumVideoClip(clipInput, baseImgPath, outputDir, i, VIDEO_CLIP_DURATION));
+    } else {
+      logger.info(`[ContentGen] Video — clip ${i + 1}/3: Ken Burns (no visualConcept)`);
+      const kb = path.join(outputDir, `_tmp_video_clip${i + 1}_kb.mp4`);
+      await kenBurnsVideo(baseImgPath, kb, 1080, 1920, VIDEO_CLIP_DURATION, null, 0.0015 + i * 0.0003);
+      clips.push(kb);
+    }
+  }
+
+  // ── Audio ─────────────────────────────────────────────────────────────────
+  const totalDuration = clips.length * VIDEO_CLIP_DURATION - (clips.length - 1) * VIDEO_TRANSITION_DURATION;
+  let audioReady = false;
+  try {
+    await prepareAudio(audio, totalDuration);
+    audioReady = true;
+  } catch (err) {
+    logger.warn('[ContentGen] Video — audio failed:', (err as Error).message);
+  }
+
+  // ── Concat 3 clips with crossfade transitions ───────────────────────────────
+  logger.info('[ContentGen] Video — concatenating 3 clips with xfade…');
+  await concatWithXfade(
+    clips,
+    audioReady ? audio : null,
+    videoOut,
+    outputDir,
+    VIDEO_CLIP_DURATION,
+    VIDEO_TRANSITION_DURATION,
+    ['fade', 'slideup'],
+  );
+
+  logger.info(`[ContentGen] Premium video complete (~${totalDuration.toFixed(1)}s).`);
+  return { video: videoOut };
+}
+
 // ── Core: Composed branded image ───────────────────────────────────────────
 
 async function composeBrandedImage(
@@ -1970,9 +2081,12 @@ function runHiggsfieldCli(args: string[], timeoutMs: number): Promise<string> {
 }
 
 export async function generateKling3Video(
-  imagePath: string,
-  input:     ContentInput,
-  outputDir: string,
+  imagePath:         string,
+  input:             ContentInput,
+  outputDir:         string,
+  sourceImagePath?:  string,
+  outputTag?:        string,
+  exactDurationSec?: number,
 ): Promise<string | null> {
   if (!input.visualConcept) {
     logger.warn('[Kling3] visualConcept empty — skipping Kling 3.0');
@@ -1984,15 +2098,23 @@ export async function generateKling3Video(
   // Kling deforms AI-baked copy text the same way Hailuo does, so animate a
   // clean (no-text) regeneration of the scene instead. Falls back to the
   // branded variation (with text) if the clean regeneration fails.
+  // If sourceImagePath is provided, the caller already has a clean scene
+  // image it wants reused as-is (e.g. anchoring multiple clips to the same
+  // base image) — use it directly and skip regenerating a new one.
   let kling3SourceImg = imagePath;
-  try {
-    const cleanBuf     = await generateCleanBrandImage(input, 1080, 1920, false);
-    const cleanImgPath = path.join(outputDir, '_tmp_kling3_clean.jpg');
-    fs.writeFileSync(cleanImgPath, cleanBuf);
-    kling3SourceImg = cleanImgPath;
-    logger.info('[Kling3] Using clean (no-text) regenerated scene as source frame');
-  } catch (err) {
-    logger.warn(`[Kling3] Clean image generation failed, using branded variation: ${(err as Error).message}`);
+  if (sourceImagePath) {
+    kling3SourceImg = sourceImagePath;
+    logger.info('[Kling3] Using provided source image (no regeneration)');
+  } else {
+    try {
+      const cleanBuf     = await generateCleanBrandImage(input, 1080, 1920, false);
+      const cleanImgPath = path.join(outputDir, '_tmp_kling3_clean.jpg');
+      fs.writeFileSync(cleanImgPath, cleanBuf);
+      kling3SourceImg = cleanImgPath;
+      logger.info('[Kling3] Using clean (no-text) regenerated scene as source frame');
+    } catch (err) {
+      logger.warn(`[Kling3] Clean image generation failed, using branded variation: ${(err as Error).message}`);
+    }
   }
 
   const basePrompt = await buildEnhancedVideoPrompt(input);
@@ -2040,8 +2162,12 @@ export async function generateKling3Video(
   fs.writeFileSync(rawPath, buf);
   logger.info(`[Kling3] Raw video saved: ${rawPath} (${Math.round(buf.length / 1024)} KB)`);
 
-  const normalized = path.join(outputDir, '_tmp_reel_clip1_kling3.mp4');
-  await normalizeVideoClip(rawPath, normalized, 1080, 1920);
+  const normalized = path.join(outputDir, outputTag ? `_tmp_${outputTag}_kling3.mp4` : '_tmp_reel_clip1_kling3.mp4');
+  if (exactDurationSec) {
+    await normalizeVideoClipExact(rawPath, normalized, 1080, 1920, exactDurationSec);
+  } else {
+    await normalizeVideoClip(rawPath, normalized, 1080, 1920);
+  }
 
   return normalized;
 }
@@ -2102,6 +2228,120 @@ async function generateVeoClip(
   return normalized;
 }
 
+// ── Premium video (real end-to-end video): per-clip fallback chain ────────
+// Same chain as the mixed reel (Grok → Kling 3.0 → Veo 2 → Ken Burns), but
+// every model is called image-to-video, anchored to the SAME base image, and
+// every output is padded/trimmed to an exact duration so the 3 clips line up
+// for concatWithXfade.
+
+async function generatePremiumVideoClip(
+  input:          ContentInput,
+  baseImgPath:    string,
+  outputDir:      string,
+  clipIndex:      number,
+  targetDuration: number,
+): Promise<string> {
+  const tag = `video_clip${clipIndex + 1}`;
+
+  logger.info(`[ContentGen] Video — ${tag}: Grok (KIE.ai) image-to-video…`);
+  try {
+    const grokPath = await generateGrokClipFromImage(input, baseImgPath, outputDir, tag, targetDuration);
+    if (!grokPath) throw new Error('Grok returned null');
+    logger.info(`[ContentGen] Video — ${tag}: Grok success`);
+    return grokPath;
+  } catch (grokErr) {
+    logger.warn(`[ContentGen] Video — ${tag}: Grok failed: ${(grokErr as Error).message} — trying Kling 3.0…`);
+  }
+
+  try {
+    const klingPath = await generateKling3Video(baseImgPath, input, outputDir, baseImgPath, tag, targetDuration);
+    if (!klingPath) throw new Error('Kling 3.0 returned null');
+    logger.info(`[ContentGen] Video — ${tag}: Kling 3.0 success`);
+    return klingPath;
+  } catch (klingErr) {
+    logger.warn(`[ContentGen] Video — ${tag}: Kling 3.0 failed: ${(klingErr as Error).message} — trying Veo 2…`);
+  }
+
+  try {
+    const veoPath = await generateVeoClipFromImage(input, baseImgPath, outputDir, tag, targetDuration);
+    if (!veoPath) throw new Error('Veo 2 returned null');
+    logger.info(`[ContentGen] Video — ${tag}: Veo 2 success`);
+    return veoPath;
+  } catch (veoErr) {
+    logger.warn(`[ContentGen] Video — ${tag}: Veo 2 failed: ${(veoErr as Error).message} — Ken Burns fallback`);
+  }
+
+  const kb = path.join(outputDir, `_tmp_${tag}_kb.mp4`);
+  await kenBurnsVideo(baseImgPath, kb, 1080, 1920, targetDuration, null, 0.0015 + clipIndex * 0.0003);
+  return kb;
+}
+
+async function generateGrokClipFromImage(
+  input:          ContentInput,
+  baseImgPath:    string,
+  outputDir:      string,
+  tag:            string,
+  targetDuration: number,
+): Promise<string | null> {
+  if (!input.visualConcept) return null;
+  if (!(process.env['KIE_API_KEY'] ?? '')) {
+    logger.warn(`[Grok] KIE_API_KEY not configured — skipping (${tag})`);
+    return null;
+  }
+
+  const prompt     = await buildEnhancedVideoPrompt(input);
+  const imageUrl   = await kie.uploadImageToKie(baseImgPath);
+  const rawPath    = await kie.generateGrokVideoFromImage(prompt, imageUrl, outputDir);
+  const normalized = path.join(outputDir, `_tmp_${tag}_grok.mp4`);
+  await normalizeVideoClipExact(rawPath, normalized, 1080, 1920, targetDuration);
+
+  return normalized;
+}
+
+async function generateVeoClipFromImage(
+  input:          ContentInput,
+  baseImgPath:    string,
+  outputDir:      string,
+  tag:            string,
+  targetDuration: number,
+): Promise<string | null> {
+  if (!input.visualConcept) return null;
+
+  const baseImgB64 = fs.readFileSync(baseImgPath).toString('base64');
+
+  const result = await generateVideo({
+    prompt:       input.visualConcept,
+    businessName: input.businessName,
+    copyText:     input.copyText,
+    clientPhotos: [baseImgB64],
+    campaignId:   input.campaignId ?? 'video',
+    strategyId:   `video-${tag}-${Date.now()}`,
+    aspectRatio:  '9:16',
+    durationSec:  8,
+  });
+
+  if (!result.filePath) {
+    logger.warn(`[generateVeoClipFromImage] filePath null — Veo 2 failed (${tag})`);
+    return null;
+  }
+
+  const match = result.filePath.match(/\/uploads\/(.+)$/);
+  if (!match) {
+    logger.warn(`[generateVeoClipFromImage] Cannot parse filePath: ${result.filePath}`);
+    return null;
+  }
+  const uploadsBase = process.env['UPLOADS_DIR']
+    ? path.resolve(process.env['UPLOADS_DIR'])
+    : path.resolve('./uploads');
+  const srcPath = path.join(uploadsBase, match[1]);
+  if (!fs.existsSync(srcPath)) return null;
+
+  const normalized = path.join(outputDir, `_tmp_${tag}_veo.mp4`);
+  await normalizeVideoClipExact(srcPath, normalized, 1080, 1920, targetDuration);
+
+  return normalized;
+}
+
 // Re-encode a video clip to a known spec so it can be safely concatenated
 function normalizeVideoClip(
   inputPath:   string,
@@ -2124,6 +2364,38 @@ function normalizeVideoClip(
       .output(outputPath)
       .on('end',   () => resolve())
       .on('error', (e: Error) => reject(new Error(`normalizeVideoClip: ${e.message}`)))
+      .run();
+  });
+}
+
+// Like normalizeVideoClip, but guarantees an EXACT output duration regardless
+// of the source's native length: pads with a cloned last frame (tpad) if the
+// clip is shorter than the target, then hard-trims to the target. Used when
+// clips from different AI models (each with its own native duration) must
+// line up exactly for concatWithXfade, whose crossfade offsets assume every
+// clip shares the same clipDuration.
+function normalizeVideoClipExact(
+  inputPath:     string,
+  outputPath:    string,
+  width:         number,
+  height:        number,
+  exactDuration: number,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ffmpeg()
+      .input(inputPath)
+      .videoFilter(
+        `scale=${width}:${height}:force_original_aspect_ratio=decrease,` +
+        `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,` +
+        `format=yuv420p,` +
+        `tpad=stop_mode=clone:stop_duration=${exactDuration}`,
+      )
+      .videoCodec('libx264')
+      .outputOptions(['-r 25', '-preset fast', '-crf 22', `-t ${exactDuration}`])
+      .noAudio()
+      .output(outputPath)
+      .on('end',   () => resolve())
+      .on('error', (e: Error) => reject(new Error(`normalizeVideoClipExact: ${e.message}`)))
       .run();
   });
 }
