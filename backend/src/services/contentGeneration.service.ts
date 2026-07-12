@@ -2696,6 +2696,17 @@ async function concatWithXfade(
       prevLabel = outLabel;
     }
 
+    // fluent-ffmpeg spawns ffmpeg without a shell, so the raw filter string
+    // (brackets, semicolons) reaches -filter_complex unquoted and unescaped.
+    // Write it to a file and use -filter_complex_script instead, same pattern
+    // as concatWithAudio's concat list file.
+    const filterScriptPath = path.join(tmpDir, `_tmp_xfade_filter_${Date.now()}.txt`);
+    fs.writeFileSync(filterScriptPath, filterParts.join(';'));
+
+    const cleanupFilterScript = () => {
+      try { if (fs.existsSync(filterScriptPath)) fs.unlinkSync(filterScriptPath); } catch { /* ignore */ }
+    };
+
     await new Promise<void>((resolve, reject) => {
       const cmd = ffmpeg();
       clips.forEach(c => cmd.input(c));
@@ -2703,14 +2714,17 @@ async function concatWithXfade(
       logger.error(`[XFADE DEBUG] joined filter: ${filterParts.join(';')}`);
       logger.error(`[XFADE DEBUG] clips array: ${JSON.stringify(clips)}`);
       cmd
-        .complexFilter(filterParts.join(';'), '[vout]')
+        .outputOptions([
+          '-filter_complex_script', filterScriptPath,
+          '-map', '[vout]',
+          '-preset fast', '-crf 22', '-pix_fmt yuv420p',
+        ])
         .videoCodec('libx264')
-        .outputOptions(['-preset fast', '-crf 22', '-pix_fmt yuv420p'])
         .noAudio()
         .output(silentOut)
         .on('start', (c: string) => logger.error(`[FFmpeg xfade FULL CMD] ${c}`))
-        .on('end', () => resolve())
-        .on('error', (e: Error) => reject(new Error(`XFade concat: ${e.message}`))).run();
+        .on('end', () => { cleanupFilterScript(); resolve(); })
+        .on('error', (e: Error) => { cleanupFilterScript(); reject(new Error(`XFade concat: ${e.message}`)); }).run();
     });
   }
 
