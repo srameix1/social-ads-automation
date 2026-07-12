@@ -2708,7 +2708,7 @@ async function concatWithXfade(
         .outputOptions(['-preset fast', '-crf 22', '-pix_fmt yuv420p'])
         .noAudio()
         .output(silentOut)
-        .on('start', (c: string) => logger.debug('[FFmpeg xfade]', { cmd: c.slice(0, 200) }))
+        .on('start', (c: string) => logger.error(`[FFmpeg xfade FULL CMD] ${c}`))
         .on('end', () => resolve())
         .on('error', (e: Error) => reject(new Error(`XFade concat: ${e.message}`))).run();
     });
