@@ -2699,6 +2699,9 @@ async function concatWithXfade(
     await new Promise<void>((resolve, reject) => {
       const cmd = ffmpeg();
       clips.forEach(c => cmd.input(c));
+      logger.error('[XFADE DEBUG] filterParts:', JSON.stringify(filterParts));
+      logger.error('[XFADE DEBUG] joined filter:', filterParts.join(';'));
+      logger.error('[XFADE DEBUG] clips array:', JSON.stringify(clips));
       cmd
         .complexFilter(filterParts.join(';'), '[vout]')
         .videoCodec('libx264')
