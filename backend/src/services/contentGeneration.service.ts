@@ -620,7 +620,7 @@ async function _runPremiumReelFromImage(
 // last resort. No closing card — logo/copy are applied afterward via
 // applyVideoOverlays.
 
-const VIDEO_TIMEOUT_MS          = 8 * 60 * 1000; // 8 minutes hard ceiling, same as reel
+const VIDEO_TIMEOUT_MS          = 20 * 60 * 1000; // 20 minutes hard ceiling — 3 real clips (Grok/Kling/Veo) + concat can exceed 8 min
 const VIDEO_CLIP_DURATION       = 7;              // seconds per clip — must be uniform for xfade offset math
 const VIDEO_TRANSITION_DURATION = 0.5;             // seconds
 
@@ -637,7 +637,7 @@ export async function generatePremiumVideoFromImage(
 ): Promise<{ video: string }> {
   const timeoutGuard = new Promise<never>((_, reject) =>
     setTimeout(
-      () => reject(new Error('[Timeout] generatePremiumVideoFromImage exceeded 8 minutes — process cancelled')),
+      () => reject(new Error('[Timeout] generatePremiumVideoFromImage exceeded 20 minutes — process cancelled')),
       VIDEO_TIMEOUT_MS,
     ),
   );
