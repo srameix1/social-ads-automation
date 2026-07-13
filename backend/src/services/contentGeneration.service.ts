@@ -16,7 +16,6 @@ import { promisify } from 'util';
 import { pathToFileURL } from 'url';
 import sharp from 'sharp';
 import Anthropic from '@anthropic-ai/sdk';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import ffmpeg from 'fluent-ffmpeg';
 import { logger } from '../utils/logger';
 import { generateVideo } from './veo.service';
@@ -28,8 +27,6 @@ import { generateVideoPrompt } from './claude.service';
 const GEMINI_API_KEY_ENV      = () => process.env.GEMINI_API_KEY      ?? '';
 const OPENAI_API_KEY_ENV      = () => process.env.OPENAI_API_KEY      ?? '';
 const REPLICATE_API_TOKEN_ENV = () => process.env.REPLICATE_API_TOKEN ?? '';
-
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 const execFileAsync = promisify(execFile);
 
