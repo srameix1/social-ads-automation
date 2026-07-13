@@ -2286,7 +2286,8 @@ async function generateGrokClipFromImage(
     return null;
   }
 
-  const prompt     = await buildEnhancedVideoPrompt(input);
+  const basePrompt = await buildEnhancedVideoPrompt(input);
+  const prompt     = `${basePrompt} No text, no signs, no captions, no subtitles, no watermarks, no UI elements.`;
   const imageUrl   = await kie.uploadImageToKie(baseImgPath);
   const rawPath    = await kie.generateGrokVideoFromImage(prompt, imageUrl, outputDir);
   const normalized = path.join(outputDir, `_tmp_${tag}_grok.mp4`);
@@ -2305,9 +2306,11 @@ async function generateVeoClipFromImage(
   if (!input.visualConcept) return null;
 
   const baseImgB64 = fs.readFileSync(baseImgPath).toString('base64');
+  const basePrompt  = await buildEnhancedVideoPrompt(input);
+  const prompt      = `${basePrompt} No text, no signs, no captions, no subtitles, no watermarks, no UI elements.`;
 
   const result = await generateVideo({
-    prompt:       input.visualConcept,
+    prompt,
     businessName: input.businessName,
     copyText:     input.copyText,
     clientPhotos: [baseImgB64],
