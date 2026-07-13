@@ -2513,34 +2513,49 @@ export async function applyVideoOverlays(
   return new Promise((resolve, reject) => {
     const cmd = ffmpeg().input(videoPath);
 
+    // fluent-ffmpeg spawns ffmpeg without a shell, so the raw filter string
+    // (brackets, semicolons) reaches -filter_complex unquoted and unescaped.
+    // Write it to a file and use -filter_complex_script instead, same pattern
+    // as concatWithXfade.
+    let filterScriptPath: string;
+
     if (hasLogo && hasText) {
       cmd.input(logoPath!);
-      cmd.complexFilter(
+      filterScriptPath = path.join(path.dirname(outputPath), `_tmp_overlay_filter_${Date.now()}.txt`);
+      fs.writeFileSync(
+        filterScriptPath,
         `[0:v]format=yuv420p[vid];` +
         `[1:v]scale=360:180:force_original_aspect_ratio=decrease:flags=lanczos[logo];` +
         `[vid][logo]overlay=W-w-20:20[base];` +
         `[base]${drawTextFilters.join(',')}[outv]`,
       );
-      cmd.outputOptions(['-map [outv]', '-map 0:a:0?', '-c:a aac', '-b:a 128k']);
+      cmd.outputOptions(['-filter_complex_script', filterScriptPath, '-map', '[outv]', '-map', '0:a:0?', '-c:a', 'aac', '-b:a', '128k']);
     } else if (hasLogo) {
       cmd.input(logoPath!);
-      cmd.complexFilter(
+      filterScriptPath = path.join(path.dirname(outputPath), `_tmp_overlay_filter_${Date.now()}.txt`);
+      fs.writeFileSync(
+        filterScriptPath,
         `[0:v]format=yuv420p[vid];` +
         `[1:v]scale=360:180:force_original_aspect_ratio=decrease:flags=lanczos[logo];` +
         `[vid][logo]overlay=W-w-20:20[outv]`,
       );
-      cmd.outputOptions(['-map [outv]', '-map 0:a:0?', '-c:a aac', '-b:a 128k']);
+      cmd.outputOptions(['-filter_complex_script', filterScriptPath, '-map', '[outv]', '-map', '0:a:0?', '-c:a', 'aac', '-b:a', '128k']);
     } else {
-      // Text only — complexFilter with explicit [0:v] handles any stream ordering
+      // Text only — explicit [0:v] handles any stream ordering
       // (e.g. audio at index 0, video at index 1) without -vf injection errors
-      cmd.complexFilter(`[0:v]format=yuv420p,${drawTextFilters.join(',')}[outv]`);
-      cmd.outputOptions(['-map [outv]', '-map 0:a:0?', '-c:a aac', '-b:a 128k']);
+      filterScriptPath = path.join(path.dirname(outputPath), `_tmp_overlay_filter_${Date.now()}.txt`);
+      fs.writeFileSync(filterScriptPath, `[0:v]format=yuv420p,${drawTextFilters.join(',')}[outv]`);
+      cmd.outputOptions(['-filter_complex_script', filterScriptPath, '-map', '[outv]', '-map', '0:a:0?', '-c:a', 'aac', '-b:a', '128k']);
     }
+
+    const cleanupFilterScript = () => {
+      try { if (fs.existsSync(filterScriptPath)) fs.unlinkSync(filterScriptPath); } catch { /* ignore */ }
+    };
 
     cmd
       .output(outputPath)
-      .on('end',   () => { logger.info(`[applyVideoOverlays] Done: ${path.basename(outputPath)}`); resolve(); })
-      .on('error', (e: Error) => reject(new Error(`applyVideoOverlays: ${e.message}`)))
+      .on('end',   () => { cleanupFilterScript(); logger.info(`[applyVideoOverlays] Done: ${path.basename(outputPath)}`); resolve(); })
+      .on('error', (e: Error) => { cleanupFilterScript(); reject(new Error(`applyVideoOverlays: ${e.message}`)); })
       .run();
   });
 }
