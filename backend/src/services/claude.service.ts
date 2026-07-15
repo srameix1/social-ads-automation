@@ -15,6 +15,7 @@ export interface StrategyDraft {
   visual_concept: string;
   tone:           string;
   target_hook:    string;
+  video_hook:     string;
 }
 
 interface GenerateInput {
@@ -251,7 +252,81 @@ Solo JSON, nada más.`;
   const content = response.content[0];
   if (content.type !== 'text') throw new Error('Respuesta inesperada de Claude');
 
-  return parseStrategies(content.text);
+  const drafts = parseStrategies(content.text);
+
+  const hooks = await Promise.all(
+    drafts.map(d => generateVideoHook({ copyText: d.copy_text, lang: input.lang })),
+  );
+  drafts.forEach((d, i) => { d.video_hook = hooks[i]; });
+
+  return drafts;
+}
+
+// ── Video Hook Generation (short overlay hook, separate from copy_text) ───
+
+export interface VideoHookInput {
+  copyText: string;
+  lang?:    string;
+}
+
+function fallbackVideoHook(copyText: string): string {
+  const trimmed = copyText.trim();
+  const match   = trimmed.match(/^[^.!?]+[.!?]/);
+  return (match ? match[0] : trimmed).trim();
+}
+
+export async function generateVideoHook(input: VideoHookInput): Promise<string> {
+  if (!client) return fallbackVideoHook(input.copyText);
+
+  const langInstr = input.lang === 'en'
+    ? 'Respond in English.'
+    : input.lang === 'pt'
+    ? 'Responda em português brasileiro.'
+    : 'Responde en español.';
+
+  const systemPrompt =
+    'Eres un experto en hooks para video de redes sociales (Reels/TikTok). ' +
+    'Tu única tarea es convertir un copy publicitario largo en un titular corto ' +
+    'que detenga el scroll en 1 segundo. No resumes el copy ni lo cortas — creas ' +
+    `un gancho propio, nuevo. ${langInstr} Responde solo con el texto del gancho, ` +
+    'sin comillas, sin explicaciones.';
+
+  const userPrompt = `COPY COMPLETO DEL ANUNCIO (contexto — no lo repitas literal ni lo cortes):
+"${input.copyText}"
+
+Genera UN gancho de video basado en este copy, para superponer como texto en los primeros segundos del video.
+
+REGLAS:
+- Máximo 8-10 palabras.
+- Estilo TITULAR, no oración descriptiva. No hace falta punto final.
+- Debe tener tensión o intriga real — antecede al copy, no lo resume.
+- Debe ser una idea completa en sí misma, nunca una frase cortada a la mitad.
+- No puede contradecir ni repetir textualmente el copy de arriba.
+
+EJEMPLO DE MAL GANCHO (oración larga cortada a la mitad — esto es exactamente lo que NO quiero):
+"Algo cambió en la limpieza de casas en Boca Ra..."
+
+EJEMPLO DE BUEN GANCHO (titular corto, completo, con gancho real):
+"Boca Raton ya no paga de más por limpieza."
+
+Devuelve SOLO el texto del gancho, nada más.`;
+
+  try {
+    const response = await client.messages.create({
+      model:      'claude-haiku-4-5-20251001',
+      max_tokens: 60,
+      system:     systemPrompt,
+      messages:   [{ role: 'user', content: userPrompt }],
+    }, { timeout: 15_000 });
+
+    const content = response.content[0];
+    if (content.type !== 'text') throw new Error('unexpected response type');
+    const hook = content.text.trim().replace(/^["']|["']$/g, '').trim();
+    return hook || fallbackVideoHook(input.copyText);
+  } catch (err) {
+    logger.warn(`[Claude] generateVideoHook failed: ${(err as Error).message} — using fallback`);
+    return fallbackVideoHook(input.copyText);
+  }
 }
 
 // ── Video Prompt Generation (UGC framework) ───────────────────────────────

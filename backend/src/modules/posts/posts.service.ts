@@ -308,10 +308,10 @@ export async function generateCopyOptions(
         const d = drafts[i];
         const [s] = await dbClient.query<Strategy>(
           `INSERT INTO strategies
-             (post_id, title, description, copy_text, visual_concept, tone, target_hook, position)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             (post_id, title, description, copy_text, visual_concept, tone, target_hook, video_hook, position)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            RETURNING *`,
-          [postId, d.title, d.description, d.copy_text, d.visual_concept, d.tone, d.target_hook, i + 1],
+          [postId, d.title, d.description, d.copy_text, d.visual_concept, d.tone, d.target_hook, d.video_hook, i + 1],
         ).then(r => r.rows);
         saved.push(s);
       }
@@ -587,10 +587,11 @@ async function applyOverlaysToPost(
     variation_url:  string | null;
     variation_type: string | null;
     copy_text:      string | null;
+    video_hook:     string | null;
     brand_logo_url: string | null;
   }>(
     `SELECT vv.id AS variation_id, vv.url AS variation_url, vv.type AS variation_type,
-            s.copy_text, cp.brand_logo_url
+            s.copy_text, s.video_hook, cp.brand_logo_url
      FROM posts p
      LEFT JOIN visual_variations vv ON vv.id = p.visual_variation_id
      LEFT JOIN strategies s         ON s.id  = p.strategy_id
@@ -635,7 +636,7 @@ async function applyOverlaysToPost(
     }
   }
 
-  await applyVideoOverlays(inputPath, row.copy_text ?? '', logoPath, overlayLogo, overlayCopy, outputPath);
+  await applyVideoOverlays(inputPath, row.video_hook ?? row.copy_text ?? '', logoPath, overlayLogo, overlayCopy, outputPath);
 
   const newUrl = `/uploads/${path.relative(uploadsDir, outputPath).replace(/\\/g, '/')}`;
   await query('UPDATE visual_variations SET url = $1 WHERE id = $2', [newUrl, row.variation_id]);
