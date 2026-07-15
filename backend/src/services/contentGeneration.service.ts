@@ -2273,6 +2273,12 @@ async function generatePremiumVideoClip(
   return kb;
 }
 
+// Appended to every AI-video prompt as a final safety layer — independent of
+// whatever businessName handling happens upstream in buildEnhancedVideoPrompt.
+const VIDEO_PROMPT_NEGATIVE_SUFFIX =
+  ' No text, no signs, no captions, no subtitles, no watermarks, no UI elements, ' +
+  'no logos, no brand names or business names rendered as visible text, no storefront signage with text.';
+
 async function generateGrokClipFromImage(
   input:          ContentInput,
   baseImgPath:    string,
@@ -2287,7 +2293,7 @@ async function generateGrokClipFromImage(
   }
 
   const basePrompt = await buildEnhancedVideoPrompt(input);
-  const prompt     = `${basePrompt} No text, no signs, no captions, no subtitles, no watermarks, no UI elements.`;
+  const prompt     = `${basePrompt}${VIDEO_PROMPT_NEGATIVE_SUFFIX}`;
   const imageUrl   = await kie.uploadImageToKie(baseImgPath);
   const rawPath    = await kie.generateGrokVideoFromImage(prompt, imageUrl, outputDir);
   const normalized = path.join(outputDir, `_tmp_${tag}_grok.mp4`);
@@ -2307,7 +2313,7 @@ async function generateVeoClipFromImage(
 
   const baseImgB64 = fs.readFileSync(baseImgPath).toString('base64');
   const basePrompt  = await buildEnhancedVideoPrompt(input);
-  const prompt      = `${basePrompt} No text, no signs, no captions, no subtitles, no watermarks, no UI elements.`;
+  const prompt      = `${basePrompt}${VIDEO_PROMPT_NEGATIVE_SUFFIX}`;
 
   const result = await generateVideo({
     prompt,

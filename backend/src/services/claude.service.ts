@@ -350,18 +350,19 @@ export interface VideoPromptInput {
 }
 
 function buildFallbackVideoPrompt(input: VideoPromptInput): string {
-  const scene = input.visualConcept || `professional scene for ${input.businessName}`;
+  const businessType = input.businessType || 'this business';
+  const scene = input.visualConcept || `professional scene for ${businessType}`;
   return [
     'DURATION: 8 seconds',
     'ASPECT RATIO: 9:16',
-    `STYLE: Cinematic advertising video for ${input.businessName}, warm natural lighting, premium look`,
+    `STYLE: Cinematic advertising video for a ${businessType}, warm natural lighting, premium look`,
     'CAMERA STYLE: Slow dolly push-in, gentle pan, subtle zoom, rack focus on subject',
     `SCENE 1 (0s-3s): ${scene}. Opening establishing shot with warm lighting.`,
     'SCENE 2 (3s-6s): Close-up detail shot highlighting the key subject. Soft bokeh background.',
     'SCENE 3 (6s-8s): Hero shot — premium aspirational still frame of the main subject.',
     'LIGHTING: Warm natural or studio lighting, well-exposed, high key with soft shadows',
     'ATMOSPHERE: premium, authentic, aspirational, professional, warm',
-    'NEGATIVE PROMPT: no text, no logos, no watermarks, no dark moody lighting, no abstract visuals, no CGI, no animation, no glowing effects',
+    'NEGATIVE PROMPT: no text, no logos, no watermarks, no brand names or business names rendered as visible text, no storefront signage with text, no dark moody lighting, no abstract visuals, no CGI, no animation, no glowing effects',
   ].join('\n');
 }
 
@@ -382,6 +383,11 @@ BUSINESS TYPE: ${input.businessType}
 VISUAL CONCEPT: ${input.visualConcept}
 AD COPY: ${input.copyText}
 BRAND COLOR: ${input.primaryColor}${carNote}
+
+IMPORTANT: BUSINESS is background context only, to help you understand what
+kind of business this is — it must NEVER appear as visible text, a sign, a
+storefront logo, or any written brand name inside the scene you describe.
+Describe generic, unbranded scenes (people, product, environment) only.
 
 Return EXACTLY this structure — no extra text, no markdown, no empty lines between sections:
 DURATION: 8 seconds
