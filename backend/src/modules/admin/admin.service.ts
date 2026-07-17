@@ -11,8 +11,20 @@ export async function getStats() {
     SELECT
       (SELECT COUNT(*) FROM users WHERE role = 'client') AS total_clients,
       (SELECT COUNT(*) FROM campaigns)                   AS total_campaigns,
-      (SELECT COUNT(*) FROM campaigns WHERE status NOT IN ('completed','failed','draft')) AS active_campaigns,
-      (SELECT COUNT(*) FROM campaigns WHERE status = 'completed') AS completed_campaigns
+      (SELECT COUNT(*) FROM campaigns c
+        WHERE NOT EXISTS (SELECT 1 FROM posts p WHERE p.campaign_id = c.id)
+           OR EXISTS (
+             SELECT 1 FROM posts p
+             WHERE p.campaign_id = c.id AND p.status NOT IN ('published','failed')
+           )
+      ) AS active_campaigns,
+      (SELECT COUNT(*) FROM campaigns c
+        WHERE EXISTS (SELECT 1 FROM posts p WHERE p.campaign_id = c.id)
+          AND NOT EXISTS (
+            SELECT 1 FROM posts p
+            WHERE p.campaign_id = c.id AND p.status NOT IN ('published','failed')
+          )
+      ) AS completed_campaigns
   `);
   return {
     totalClients:       parseInt(row.total_clients),
