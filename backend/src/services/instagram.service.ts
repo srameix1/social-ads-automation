@@ -3,7 +3,7 @@
  * Docs: https://developers.facebook.com/docs/instagram-api/guides/content-publishing
  *
  * Credenciales requeridas (se guardan cifradas en client_credentials):
- *   access_token:          User Access Token con permisos instagram_basic, instagram_content_publish
+ *   access_token:          User Access Token con permisos instagram_business_basic, instagram_business_content_publish
  *   instagram_account_id:  ID de la cuenta de Instagram (obtenido vía /me/accounts)
  */
 
