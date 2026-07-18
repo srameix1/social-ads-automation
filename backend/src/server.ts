@@ -5,6 +5,8 @@ import { pool } from './config/database';
 import { logger } from './utils/logger';
 import { cleanupOldFiles } from './jobs/cleanupVideos.job';
 import { runCourtesyExpiryCheck } from './jobs/courtesyExpiry.job';
+import { getBoss } from './config/pgboss';
+import { registerPublishPostWorker } from './jobs/publishPost.job';
 
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24h
 
@@ -24,7 +26,7 @@ async function start() {
       user: env.DB.user,
       DATABASE_URL: env.DATABASE_URL ? 'SET' : 'NOT SET',
     });
-    logger.warn('  Reactiva el proyecto en https://supabase.com/dashboard y reinicia el servidor');
+    logger.warn('  Verifica que el contenedor de Postgres esté corriendo en EasyPanel y reinicia el servidor');
   }
 
   // Run cleanup on startup, then every 24h
@@ -40,6 +42,16 @@ async function start() {
     runCourtesyExpiryCheck().catch(err => logger.warn('[Courtesy] Error en chequeo diario:', err));
   });
   logger.info('[Courtesy] Scheduled daily expiry check at 09:00');
+
+  // Cola de publicación (pg-boss): confirmPost encola en 'publish-post' y este
+  // worker la procesa. Sobrevive reinicios porque el job vive en Postgres, no en memoria.
+  try {
+    const boss = await getBoss();
+    await registerPublishPostWorker(boss);
+    logger.info('[PublishQueue] Worker registrado (publish-post, tiktok-check-status)');
+  } catch (err) {
+    logger.error('[PublishQueue] No se pudo iniciar pg-boss — la publicación automática quedará sin procesar:', (err as Error).message);
+  }
 
   app.listen(env.PORT, () => {
     logger.info(`✓ Servidor corriendo en http://localhost:${env.PORT}`);

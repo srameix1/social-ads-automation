@@ -65,3 +65,62 @@ export async function publishToTikTok(
   const postUrl = `https://www.tiktok.com/@${open_id}/video/${publishId}`;
   return { postId: publishId, postUrl };
 }
+
+// ── Consultar estado real de publicación ───────────────────────────────────
+// publish_id (arriba) es solo el ID de la transacción de subida — el video
+// real puede tardar de minutos a horas en pasar moderación. Este endpoint
+// ("Get Post Status" en la doc de TikTok) hay que consultarlo con polling
+// hasta PUBLISH_COMPLETE (o FAILED) para obtener el ID público real del video.
+// Docs: https://developers.tiktok.com/doc/content-posting-api-reference-get-video-status
+
+export type TikTokPublishStatus =
+  | 'PROCESSING_UPLOAD'
+  | 'PROCESSING_DOWNLOAD'
+  | 'SEND_TO_USER_INBOX'
+  | 'PUBLISH_COMPLETE'
+  | 'FAILED';
+
+export interface TikTokStatusResult {
+  status:   TikTokPublishStatus;
+  // Solo viene una vez status === 'PUBLISH_COMPLETE' y el contenido pasó
+  // moderación para visualización pública — es el ID real del video,
+  // distinto de publish_id.
+  postId:   string | null;
+  failReason?: string;
+}
+
+export async function checkTikTokPublishStatus(
+  credentials: TikTokCredentials,
+  publishId:   string,
+): Promise<TikTokStatusResult> {
+  const { access_token } = credentials;
+
+  const res = await fetch(`${TIKTOK_API}/post/publish/status/fetch/`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${access_token}`,
+      'Content-Type':  'application/json; charset=UTF-8',
+    },
+    body: JSON.stringify({ publish_id: publishId }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json() as { error?: { message: string } };
+    throw new Error(`TikTok status fetch error: ${err.error?.message ?? res.statusText}`);
+  }
+
+  const data = await res.json() as {
+    data: {
+      status?: TikTokPublishStatus;
+      publicaly_available_post_id?: number[];
+      fail_reason?: string;
+    };
+  };
+
+  const status = data.data.status ?? 'FAILED';
+  const postId = data.data.publicaly_available_post_id?.[0]?.toString() ?? null;
+
+  logger.debug(`[TikTok] Estado de publish_id ${publishId}: ${status}`);
+
+  return { status, postId, failReason: data.data.fail_reason };
+}

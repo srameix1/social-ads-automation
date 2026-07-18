@@ -5,7 +5,7 @@ import { createError } from '../../middleware/errorHandler';
 import { generateAdStrategiesForPost } from '../../services/claude.service';
 import { generateVisualsForPost, generateVideoForSelectedVariation } from '../strategies/strategies.service';
 import { applyVideoOverlays } from '../../services/contentGeneration.service';
-import { publishToSocialMedia } from '../variations/variations.service';
+import { enqueuePublishJobs } from '../../jobs/publishPost.job';
 import { logger } from '../../utils/logger';
 import { env } from '../../config/env';
 import { PoolClient } from 'pg';
@@ -552,55 +552,10 @@ export async function confirmPost(
   );
 
   if (clientProfile?.delivery_mode === 'automatic') {
-    setImmediate(() => publishConfirmedPost(post, clientId, variationUrl));
+    await enqueuePublishJobs(post, clientId, variationUrl);
   }
 
   return { post, variationUrl };
-}
-
-// ── Auto-publish a confirmed post (delivery_mode = 'automatic') ───────────
-
-async function publishConfirmedPost(
-  post:         Post,
-  clientId:     string,
-  variationUrl: string | null,
-): Promise<void> {
-  let mediaUrl = variationUrl;
-  if (!mediaUrl) {
-    const variation = await queryOne<{ url: string | null }>(
-      'SELECT url FROM visual_variations WHERE id = $1',
-      [post.visual_variation_id],
-    );
-    mediaUrl = variation?.url ?? null;
-  }
-  if (!mediaUrl) {
-    logger.error(`[publishConfirmedPost] No hay media URL para post ${post.id}, se aborta publicación automática`);
-    return;
-  }
-
-  if (!post.strategy_id) {
-    logger.error(`[publishConfirmedPost] Post ${post.id} no tiene strategy_id, se aborta publicación automática`);
-    return;
-  }
-
-  const strategy = await queryOne<{ copy_text: string }>(
-    'SELECT copy_text FROM strategies WHERE id = $1',
-    [post.strategy_id],
-  );
-  const copyText = strategy?.copy_text ?? '';
-
-  for (const platform of post.platforms) {
-    try {
-      logger.info(`[publishConfirmedPost] Publicando post ${post.id} en ${platform}`);
-      await publishToSocialMedia(
-        platform, clientId, mediaUrl, copyText,
-        post.campaign_id, post.strategy_id, null,
-      );
-      logger.info(`[publishConfirmedPost] Post ${post.id} publicado en ${platform}`);
-    } catch (err) {
-      logger.error(`[publishConfirmedPost] Error publicando post ${post.id} en ${platform}: ${(err as Error).message}`);
-    }
-  }
 }
 
 async function applyOverlaysToPost(

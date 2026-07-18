@@ -3,8 +3,7 @@ import { env } from './env';
 
 const poolConfig = env.DATABASE_URL
   ? {
-      cconnectionString: env.DATABASE_URL,
-      
+      connectionString:        env.DATABASE_URL,
       max:                     20,
       idleTimeoutMillis:       30000,
       connectionTimeoutMillis: 5000,

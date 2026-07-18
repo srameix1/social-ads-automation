@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Build tools needed for native modules (bcrypt, sharp)
 RUN apk add --no-cache python3 make g++
@@ -16,7 +16,7 @@ COPY . .
 RUN npm run build
 
 # --- Production stage ---
-FROM node:18-alpine AS runner
+FROM node:22-alpine AS runner
 
 RUN apk add --no-cache ffmpeg python3 make g++
 
