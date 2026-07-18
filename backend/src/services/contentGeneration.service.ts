@@ -21,6 +21,7 @@ import { logger } from '../utils/logger';
 import { generateVideo } from './veo.service';
 import * as kie from './kie.service';
 import { generateVideoPrompt } from './claude.service';
+import { sendTelegramAlert } from './telegram.service';
 
 // Read API keys directly from process.env so this service works as a standalone script
 // without requiring all other env vars (JWT_SECRET, ENCRYPTION_KEY, etc.)
@@ -32,6 +33,16 @@ const execFileAsync = promisify(execFile);
 
 const GEMINI_ENDPOINT =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent';
+
+// Detecta clave vencida/inválida en la llamada real a Gemini y alerta de inmediato,
+// sin importar si el caller termina haciendo fallback a DALL-E / Sharp.
+async function alertIfGeminiAuthError(status: number): Promise<void> {
+  if (status === 401 || status === 403) {
+    await sendTelegramAlert(
+      '🔑 Gemini devolvió error de autenticación (401/403) — la clave puede estar vencida o inválida. Verificar en EasyPanel.',
+    );
+  }
+}
 
 const BUNDLED_MUSIC = path.join(__dirname, '../assets/music/background.mp3');
 const FONTS_DIR     = path.join(__dirname, '../assets/fonts');
@@ -937,7 +948,10 @@ async function callGeminiWithText(
     candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { data: string; mimeType: string } }> } }>;
     error?: { message: string };
   };
-  if (!res.ok) throw new Error(json.error?.message ?? `Gemini HTTP ${res.status}`);
+  if (!res.ok) {
+    await alertIfGeminiAuthError(res.status);
+    throw new Error(json.error?.message ?? `Gemini HTTP ${res.status}`);
+  }
 
   const imgPart = json.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.data);
   if (!imgPart?.inlineData?.data) throw new Error('Gemini returned no image data');
@@ -1161,7 +1175,10 @@ Output: ONE beautiful, realistic photograph that captures exactly the scene desc
     candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { data: string; mimeType: string } }> } }>;
     error?: { message: string };
   };
-  if (!res.ok) throw new Error(json.error?.message ?? `Gemini HTTP ${res.status}`);
+  if (!res.ok) {
+    await alertIfGeminiAuthError(res.status);
+    throw new Error(json.error?.message ?? `Gemini HTTP ${res.status}`);
+  }
 
   const imgPart = json.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.data);
   if (!imgPart?.inlineData?.data) throw new Error('Gemini returned no image data');

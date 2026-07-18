@@ -3,10 +3,21 @@ import { env } from '../config/env';
 import { logger } from '../utils/logger';
 import { researchNiche, type ResearchResult } from './researchAgent.service';
 import { pickAngles, type CopyAngle } from '../utils/randomSelection';
+import { sendTelegramAlert } from './telegram.service';
 
 const client = env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
   : null;
+
+// Detecta clave vencida/inválida en la llamada real a Anthropic y alerta de inmediato,
+// sin importar si el caller termina haciendo fallback a otro proveedor.
+async function alertIfClaudeAuthError(err: unknown): Promise<void> {
+  if (err instanceof Anthropic.APIError && (err.status === 401 || err.status === 403)) {
+    await sendTelegramAlert(
+      '🔑 Anthropic/Claude devolvió error de autenticación (401/403) — la clave puede estar vencida o inválida. Verificar en EasyPanel.',
+    );
+  }
+}
 
 export interface StrategyDraft {
   title:          string;
@@ -126,12 +137,18 @@ Solo JSON, nada más.`;
 
   logger.debug('[Claude] Generando estrategias para:', input.businessName);
 
-  const response = await client.messages.create({
-    model:      'claude-opus-4-7',
-    max_tokens: 4096,
-    system:     SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userPrompt }],
-  }, { timeout: 90_000 }); // 90-second hard timeout
+  let response;
+  try {
+    response = await client.messages.create({
+      model:      'claude-opus-4-7',
+      max_tokens: 4096,
+      system:     SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userPrompt }],
+    }, { timeout: 90_000 }); // 90-second hard timeout
+  } catch (err) {
+    await alertIfClaudeAuthError(err);
+    throw err;
+  }
 
   const content = response.content[0];
   if (content.type !== 'text') {
@@ -242,12 +259,18 @@ Solo JSON, nada más.`;
     throw new Error('ANTHROPIC_API_KEY no configurada — agrega tu clave en el archivo .env');
   }
 
-  const response = await client.messages.create({
-    model:      'claude-opus-4-7',
-    max_tokens: 4096,
-    system:     buildSystemPrompt(input.lang),
-    messages: [{ role: 'user', content: userPrompt }],
-  }, { timeout: 90_000 });
+  let response;
+  try {
+    response = await client.messages.create({
+      model:      'claude-opus-4-7',
+      max_tokens: 4096,
+      system:     buildSystemPrompt(input.lang),
+      messages: [{ role: 'user', content: userPrompt }],
+    }, { timeout: 90_000 });
+  } catch (err) {
+    await alertIfClaudeAuthError(err);
+    throw err;
+  }
 
   const content = response.content[0];
   if (content.type !== 'text') throw new Error('Respuesta inesperada de Claude');
@@ -324,6 +347,7 @@ Devuelve SOLO el texto del gancho, nada más.`;
     const hook = content.text.trim().replace(/^["']|["']$/g, '').trim();
     return hook || fallbackVideoHook(input.copyText);
   } catch (err) {
+    await alertIfClaudeAuthError(err);
     logger.warn(`[Claude] generateVideoHook failed: ${(err as Error).message} — using fallback`);
     return fallbackVideoHook(input.copyText);
   }
@@ -413,6 +437,7 @@ NEGATIVE PROMPT: [10-15 things to avoid, comma-separated]`;
     if (content.type !== 'text') throw new Error('unexpected response type');
     return content.text.trim();
   } catch (err) {
+    await alertIfClaudeAuthError(err);
     logger.warn(`[Claude] generateVideoPrompt failed: ${(err as Error).message} — using fallback`);
     return buildFallbackVideoPrompt(input);
   }
