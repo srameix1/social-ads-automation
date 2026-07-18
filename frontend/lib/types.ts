@@ -122,6 +122,8 @@ export interface Post {
   workflow_status:     WorkflowStatus;
   overlay_logo:        boolean;
   overlay_copy:        boolean;
+  copy_generation_attempts:   number;
+  visual_generation_attempts: number;
   selected_visual_url: string | null;
   published_at:        string | null;
   error_message:       string | null;
@@ -168,6 +170,8 @@ export interface PlanLimits {
   can_generate_video:     boolean;
   can_generate_reel:      boolean;
   reel_quota:             number;
+  max_copy_attempts:      number;
+  max_visual_attempts:    number;
   created_at:             string;
   updated_at:             string;
 }

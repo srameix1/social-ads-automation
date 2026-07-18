@@ -54,6 +54,36 @@ export async function updatePlanLimit(req: Request, res: Response, next: NextFun
   } catch (err) { next(err); }
 }
 
+export async function updatePostAttempts(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { copy_generation_attempts, visual_generation_attempts } = req.body as {
+      copy_generation_attempts?:   unknown;
+      visual_generation_attempts?: unknown;
+    };
+    const data: Partial<{ copy_generation_attempts: number; visual_generation_attempts: number }> = {};
+
+    if (copy_generation_attempts !== undefined) {
+      const val = parseInt(copy_generation_attempts as string, 10);
+      if (isNaN(val) || val < 0) {
+        res.status(400).json({ error: 'copy_generation_attempts debe ser un número no negativo' });
+        return;
+      }
+      data.copy_generation_attempts = val;
+    }
+    if (visual_generation_attempts !== undefined) {
+      const val = parseInt(visual_generation_attempts as string, 10);
+      if (isNaN(val) || val < 0) {
+        res.status(400).json({ error: 'visual_generation_attempts debe ser un número no negativo' });
+        return;
+      }
+      data.visual_generation_attempts = val;
+    }
+
+    const post = await adminService.updatePostAttempts(req.params.id, data);
+    res.json({ post });
+  } catch (err) { next(err); }
+}
+
 export async function updateCampaignMaxPosts(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const maxPosts = parseInt(req.body.max_posts);

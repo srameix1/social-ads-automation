@@ -92,6 +92,13 @@ export async function getReelUsage(req: Request, res: Response, next: NextFuncti
   } catch (err) { next(err); }
 }
 
+export async function getAttemptLimits(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const limits = await clientsService.getAttemptLimits(req.user!.userId);
+    res.json(limits);
+  } catch (err) { next(err); }
+}
+
 export async function uploadPhotos(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const files = req.files as Record<string, Express.Multer.File[]> | undefined;

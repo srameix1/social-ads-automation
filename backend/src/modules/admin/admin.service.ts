@@ -141,14 +141,67 @@ export async function getAllCampaigns() {
 }
 
 export async function getCampaignDetail(id: string) {
-  const campaign = await queryOne<{ id: string }>('SELECT * FROM campaigns WHERE id = $1', [id]);
+  const campaign = await queryOne<{ id: string; client_id: string }>('SELECT * FROM campaigns WHERE id = $1', [id]);
   if (!campaign) throw createError('Campaña no encontrada', 404);
 
-  const strategies   = await query('SELECT * FROM strategies WHERE campaign_id = $1 ORDER BY position', [id]);
+  const strategies   = await query(
+    `SELECT s.* FROM strategies s
+     JOIN posts p ON p.id = s.post_id
+     WHERE p.campaign_id = $1
+     ORDER BY s.position`,
+    [id],
+  );
   const publications = await query('SELECT * FROM publications WHERE campaign_id = $1', [id]);
   const mediaAssets  = await query('SELECT * FROM media_assets WHERE campaign_id = $1', [id]);
+  const posts        = await query<{
+    id: string; workflow_status: string; status: string; platforms: string[]; format: string;
+    scheduled_date: string | null; created_at: string;
+    copy_generation_attempts: number; visual_generation_attempts: number;
+  }>(
+    `SELECT id, workflow_status, status, platforms, format, scheduled_date, created_at,
+            copy_generation_attempts, visual_generation_attempts
+     FROM posts
+     WHERE campaign_id = $1
+     ORDER BY created_at DESC`,
+    [id],
+  );
+  const [attemptLimits] = await query<{ max_copy_attempts: number; max_visual_attempts: number }>(
+    `SELECT COALESCE(pl.max_copy_attempts, 5) AS max_copy_attempts,
+            COALESCE(pl.max_visual_attempts, 2) AS max_visual_attempts
+     FROM client_profiles cp
+     LEFT JOIN plan_limits pl ON pl.plan = cp.plan
+     WHERE cp.user_id = $1`,
+    [campaign.client_id],
+  );
 
-  return { ...campaign, strategies, publications, mediaAssets };
+  return {
+    ...campaign, strategies, publications, mediaAssets, posts,
+    maxCopyAttempts:   attemptLimits?.max_copy_attempts   ?? 5,
+    maxVisualAttempts: attemptLimits?.max_visual_attempts ?? 2,
+  };
+}
+
+export async function updatePostAttempts(
+  postId: string,
+  data: Partial<{ copy_generation_attempts: number; visual_generation_attempts: number }>,
+): Promise<{ id: string; copy_generation_attempts: number; visual_generation_attempts: number }> {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  let i = 1;
+
+  if (data.copy_generation_attempts   !== undefined) { fields.push(`copy_generation_attempts = $${i++}`);   values.push(data.copy_generation_attempts); }
+  if (data.visual_generation_attempts !== undefined) { fields.push(`visual_generation_attempts = $${i++}`); values.push(data.visual_generation_attempts); }
+
+  if (!fields.length) throw createError('Nada que actualizar', 400);
+
+  values.push(postId);
+  const [updated] = await query<{ id: string; copy_generation_attempts: number; visual_generation_attempts: number }>(
+    `UPDATE posts SET ${fields.join(', ')} WHERE id = $${i}
+     RETURNING id, copy_generation_attempts, visual_generation_attempts`,
+    values,
+  );
+  if (!updated) throw createError('Anuncio no encontrado', 404);
+  return updated;
 }
 
 // ── Plan limits ─────────────────────────────────────────────────────────────
@@ -160,6 +213,8 @@ export interface PlanLimit {
   can_upload_photos:      boolean;
   can_generate_video:     boolean;
   can_generate_reel:      boolean;
+  max_copy_attempts:      number;
+  max_visual_attempts:    number;
   created_at:             string;
   updated_at:             string;
 }
@@ -172,7 +227,7 @@ export async function getPlanLimits(): Promise<PlanLimit[]> {
 
 export async function updatePlanLimit(
   plan: string,
-  data: Partial<Pick<PlanLimit, 'max_posts_per_campaign' | 'can_upload_photos' | 'can_generate_video' | 'can_generate_reel'>>,
+  data: Partial<Pick<PlanLimit, 'max_posts_per_campaign' | 'can_upload_photos' | 'can_generate_video' | 'can_generate_reel' | 'max_copy_attempts' | 'max_visual_attempts'>>,
 ): Promise<PlanLimit> {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -182,6 +237,8 @@ export async function updatePlanLimit(
   if (data.can_upload_photos      !== undefined) { fields.push(`can_upload_photos = $${i++}`);      values.push(data.can_upload_photos); }
   if (data.can_generate_video     !== undefined) { fields.push(`can_generate_video = $${i++}`);     values.push(data.can_generate_video); }
   if (data.can_generate_reel      !== undefined) { fields.push(`can_generate_reel = $${i++}`);      values.push(data.can_generate_reel); }
+  if (data.max_copy_attempts      !== undefined) { fields.push(`max_copy_attempts = $${i++}`);      values.push(data.max_copy_attempts); }
+  if (data.max_visual_attempts    !== undefined) { fields.push(`max_visual_attempts = $${i++}`);    values.push(data.max_visual_attempts); }
 
   if (!fields.length) throw createError('Nada que actualizar', 400);
 

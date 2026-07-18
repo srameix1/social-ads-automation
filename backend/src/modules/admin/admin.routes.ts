@@ -16,6 +16,7 @@ router.patch('/clients/:id/courtesy', controller.updateCourtesy);
 router.get('/campaigns',              controller.listCampaigns);
 router.get('/campaigns/:id',          controller.getCampaign);
 router.patch('/campaigns/:id/max-posts', controller.updateCampaignMaxPosts);
+router.patch('/posts/:id/attempts',      controller.updatePostAttempts);
 router.get('/plan-limits',            controller.getPlanLimits);
 router.put('/plan-limits/:plan',      controller.updatePlanLimit);
 

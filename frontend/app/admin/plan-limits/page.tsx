@@ -33,6 +33,8 @@ export default function PlanLimitsPage() {
       can_upload_photos:      limit.can_upload_photos,
       can_generate_video:     limit.can_generate_video,
       can_generate_reel:      limit.can_generate_reel,
+      max_copy_attempts:      limit.max_copy_attempts,
+      max_visual_attempts:    limit.max_visual_attempts,
     });
     setError('');
   };
@@ -76,6 +78,8 @@ export default function PlanLimitsPage() {
             <tr className="border-b border-white/[0.06]">
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Plan</th>
               <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Posts/mes</th>
+              <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Intentos copy</th>
+              <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Intentos img.</th>
               <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Fotos</th>
               <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Video</th>
               <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Reels</th>
@@ -103,6 +107,36 @@ export default function PlanLimitsPage() {
                       />
                     ) : (
                       <span className="text-slate-300">{limit.max_posts_per_campaign}</span>
+                    )}
+                  </td>
+
+                  <td className="px-4 py-4 text-center">
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        min={0}
+                        max={50}
+                        value={draft.max_copy_attempts ?? limit.max_copy_attempts}
+                        onChange={e => setDraft(d => ({ ...d, max_copy_attempts: parseInt(e.target.value) || 0 }))}
+                        className="w-16 text-center bg-white/[0.06] border border-white/[0.12] rounded-lg px-2 py-1 text-slate-200 focus:outline-none focus:border-brand-500/60"
+                      />
+                    ) : (
+                      <span className="text-slate-300">{limit.max_copy_attempts}</span>
+                    )}
+                  </td>
+
+                  <td className="px-4 py-4 text-center">
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        min={0}
+                        max={50}
+                        value={draft.max_visual_attempts ?? limit.max_visual_attempts}
+                        onChange={e => setDraft(d => ({ ...d, max_visual_attempts: parseInt(e.target.value) || 0 }))}
+                        className="w-16 text-center bg-white/[0.06] border border-white/[0.12] rounded-lg px-2 py-1 text-slate-200 focus:outline-none focus:border-brand-500/60"
+                      />
+                    ) : (
+                      <span className="text-slate-300">{limit.max_visual_attempts}</span>
                     )}
                   </td>
 

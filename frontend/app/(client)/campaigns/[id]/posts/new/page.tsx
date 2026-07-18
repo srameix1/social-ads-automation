@@ -67,11 +67,16 @@ export default function NewPostPage() {
   // Step 1: post-specific focus
   const [postFocus, setPostFocus] = useState('');
 
+  // Attempt limits (real, backend-enforced — closes the "Anterior" wizard loophole)
+  const [maxCopyAttempts,   setMaxCopyAttempts]   = useState(5);
+  const [maxVisualAttempts, setMaxVisualAttempts] = useState(2);
+  const [copyAttemptsUsed,   setCopyAttemptsUsed]   = useState(0);
+  const [visualAttemptsUsed, setVisualAttemptsUsed] = useState(0);
+
   // Step 2: copy options
   const [strategies,        setStrategies]        = useState<Strategy[]>([]);
   const [selectedStrategy,  setSelectedStrategy]  = useState<Strategy | null>(null);
   const [photos,            setPhotos]            = useState<File[]>([]);
-  const [copyRegenCount,    setCopyRegenCount]    = useState(5);
 
   // Step 3: visual variations
   const [variations,        setVariations]        = useState<VisualVariation[]>([]);
@@ -93,8 +98,8 @@ export default function NewPostPage() {
   const VIDEO_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
   useEffect(() => {
-    Promise.allSettled([clients.getProfile(), clients.getReelUsage()] as const)
-      .then(([profileResult, reelResult]) => {
+    Promise.allSettled([clients.getProfile(), clients.getReelUsage(), clients.getAttemptLimits()] as const)
+      .then(([profileResult, reelResult, attemptLimitsResult]) => {
         if (profileResult.status === 'fulfilled') {
           const profile = profileResult.value.profile;
           const clientPlan = profile.plan ?? 'basic';
@@ -108,6 +113,10 @@ export default function NewPostPage() {
           setReelUsed(reelResult.value.used);
           setReelQuota(reelResult.value.quota);
         }
+        if (attemptLimitsResult.status === 'fulfilled') {
+          setMaxCopyAttempts(attemptLimitsResult.value.maxCopyAttempts);
+          setMaxVisualAttempts(attemptLimitsResult.value.maxVisualAttempts);
+        }
       })
       .finally(() => setProfileLoading(false));
   }, []);
@@ -118,6 +127,8 @@ export default function NewPostPage() {
       .then(({ post }) => {
         setPostId(existingPostId);
         setWorkflowStatus(post.workflow_status);
+        setCopyAttemptsUsed(post.copy_generation_attempts ?? 0);
+        setVisualAttemptsUsed(post.visual_generation_attempts ?? 0);
         if (post.variations?.length) {
           setVariations(post.variations.filter(v => v.url));
         }
@@ -153,6 +164,7 @@ export default function NewPostPage() {
         const { post } = await postsApi.getPost(postId);
         if (cancelled) return;
         setWorkflowStatus(post.workflow_status);
+        setVisualAttemptsUsed(post.visual_generation_attempts ?? 0);
 
         if (post.workflow_status === 'generating_video') {
           setIsGeneratingVideo(true);
@@ -221,6 +233,9 @@ export default function NewPostPage() {
   const needsFormat   = formatOptions.length > 0;
   const reelAtLimit   = reelUsed >= reelQuota;
   const effectiveFormat: PostFormat = (format || 'image') as PostFormat;
+  const copyAttemptsLeft   = Math.max(maxCopyAttempts   - copyAttemptsUsed,   0);
+  const visualAttemptsLeft = Math.max(maxVisualAttempts - visualAttemptsUsed, 0);
+  const visualAttemptsAtLimit = visualAttemptsLeft <= 0;
 
   const STEP_LABELS = [
     t('post_step_config'),
@@ -279,8 +294,9 @@ export default function NewPostPage() {
     setError('');
     try {
       await postsApi.updateDescription(postId, { post_focus: postFocus });
-      const { strategies: s } = await postsApi.generateCopy(postId, lang);
+      const { post, strategies: s } = await postsApi.generateCopy(postId, lang);
       setStrategies(s);
+      setCopyAttemptsUsed(post.copy_generation_attempts ?? 0);
       setStep(2);
     } catch (err) {
       setError((err as Error).message);
@@ -290,14 +306,14 @@ export default function NewPostPage() {
   };
 
   const handleRegenerateCopy = async () => {
-    if (!postId || copyRegenCount <= 0) return;
+    if (!postId || copyAttemptsLeft <= 0) return;
     setGenerating(true);
     setError('');
     try {
-      const { strategies: s } = await postsApi.generateCopy(postId, lang);
+      const { post, strategies: s } = await postsApi.generateCopy(postId, lang);
       setStrategies(s);
       setSelectedStrategy(null);
-      setCopyRegenCount(c => c - 1);
+      setCopyAttemptsUsed(post.copy_generation_attempts ?? 0);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -306,15 +322,14 @@ export default function NewPostPage() {
   };
 
   const handleSelectCopy = async () => {
-    if (!postId || !selectedStrategy) return;
+    if (!postId || !selectedStrategy || visualAttemptsAtLimit) return;
     setGenerating(true);
     setError('');
     try {
-      if (photos.length) {
-        await postsApi.selectCopyWithPhotos(postId, selectedStrategy.id, photos);
-      } else {
-        await postsApi.selectCopy(postId, selectedStrategy.id);
-      }
+      const { post } = photos.length
+        ? await postsApi.selectCopyWithPhotos(postId, selectedStrategy.id, photos)
+        : await postsApi.selectCopy(postId, selectedStrategy.id);
+      setVisualAttemptsUsed(post.visual_generation_attempts ?? 0);
       setWorkflowStatus('generating_visuals');
       setVariations([]);
       setSelectedVariation(null);
@@ -603,7 +618,7 @@ export default function NewPostPage() {
 
             {/* Regen counter + action buttons */}
             <div className="flex flex-col items-center gap-3 pt-1">
-              <p className="text-xs text-slate-600">{t('post_regen_left', copyRegenCount)}</p>
+              <p className="text-xs text-slate-600">{t('post_regen_left', copyAttemptsLeft, maxCopyAttempts)}</p>
               <div className="flex gap-2 w-full">
                 <button
                   type="button"
@@ -619,8 +634,8 @@ export default function NewPostPage() {
                 <button
                   type="button"
                   onClick={handleRegenerateCopy}
-                  disabled={copyRegenCount <= 0 || generating}
-                  title={copyRegenCount <= 0 ? t('post_regen_limit') : undefined}
+                  disabled={copyAttemptsLeft <= 0 || generating}
+                  title={copyAttemptsLeft <= 0 ? t('post_regen_limit') : undefined}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] text-xs text-slate-400 hover:text-slate-200 hover:border-white/[0.18] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <svg className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -630,6 +645,22 @@ export default function NewPostPage() {
                 </button>
               </div>
             </div>
+
+            {selectedStrategy && (
+              <div className={`text-center text-xs rounded-xl px-3 py-2 border ${
+                visualAttemptsLeft === 1
+                  ? 'border-amber-500/30 bg-amber-500/5 text-amber-300'
+                  : visualAttemptsAtLimit
+                    ? 'border-rose-500/30 bg-rose-500/5 text-rose-400'
+                    : 'border-white/[0.06] bg-white/[0.02] text-slate-500'
+              }`}>
+                {visualAttemptsAtLimit
+                  ? t('post_visual_limit_reached', maxVisualAttempts)
+                  : visualAttemptsLeft === 1
+                    ? t('post_visual_last_attempt')
+                    : t('post_visual_attempts_left', visualAttemptsLeft, maxVisualAttempts)}
+              </div>
+            )}
 
             {selectedStrategy && (
               <div className="pt-2">
@@ -967,7 +998,7 @@ export default function NewPostPage() {
           </Button>
         )}
         {step === 2 && (
-          <Button onClick={handleSelectCopy} loading={generating} disabled={!canProceed}>
+          <Button onClick={handleSelectCopy} loading={generating} disabled={!canProceed || visualAttemptsAtLimit}>
             {generating ? t('post_sending') : t('post_gen_visuals_btn')}
           </Button>
         )}

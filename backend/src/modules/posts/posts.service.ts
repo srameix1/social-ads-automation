@@ -36,6 +36,8 @@ export interface Post {
   workflow_status:     WorkflowStatus;
   overlay_logo:        boolean;
   overlay_copy:        boolean;
+  copy_generation_attempts:   number;
+  visual_generation_attempts: number;
   published_at:        string | null;
   error_message:       string | null;
   created_at:          string;
@@ -236,6 +238,7 @@ type PostWithCampaignContext = Post & {
   campaign_ideal_client:     string | null;
   campaign_concrete_result:  string | null;
   campaign_client_pain:      string | null;
+  max_copy_attempts:         number;
 };
 
 export async function generateCopyOptions(
@@ -249,10 +252,12 @@ export async function generateCopyOptions(
        c.differentiator   AS campaign_differentiator,
        c.ideal_client     AS campaign_ideal_client,
        c.concrete_result  AS campaign_concrete_result,
-       c.client_pain      AS campaign_client_pain
+       c.client_pain      AS campaign_client_pain,
+       COALESCE(pl.max_copy_attempts, 5) AS max_copy_attempts
      FROM posts p
      JOIN campaigns c        ON c.id  = p.campaign_id
      JOIN client_profiles cp ON cp.user_id = c.client_id
+     LEFT JOIN plan_limits pl ON pl.plan = cp.plan
      WHERE p.id = $1 AND c.client_id = $2`,
     [postId, clientId],
   );
@@ -264,6 +269,14 @@ export async function generateCopyOptions(
 
   if (!hasCampaignProfile && !hasPostFocus && !hasLegacyFields) {
     throw createError('Completa la descripción del anuncio primero', 400);
+  }
+
+  if (postWithBiz.copy_generation_attempts >= postWithBiz.max_copy_attempts) {
+    throw createError(
+      `Has alcanzado el límite de generaciones de copy de tu plan (${postWithBiz.max_copy_attempts}/${postWithBiz.max_copy_attempts})`,
+      403,
+      'COPY_LIMIT_REACHED',
+    );
   }
 
   await query("UPDATE posts SET workflow_status = 'generating_copy' WHERE id = $1", [postId]);
@@ -316,7 +329,9 @@ export async function generateCopyOptions(
         saved.push(s);
       }
       await dbClient.query(
-        "UPDATE posts SET workflow_status = 'copy_ready' WHERE id = $1",
+        `UPDATE posts
+         SET workflow_status = 'copy_ready', copy_generation_attempts = copy_generation_attempts + 1
+         WHERE id = $1`,
         [postId],
       );
       return saved;
@@ -356,13 +371,24 @@ async function doSelectCopy(
   photoBuffers?: Buffer[],
 ): Promise<Post> {
   const { post, strategy } = await withTransaction(async (dbClient: PoolClient) => {
-    const postRow = await dbClient.query<Post>(
-      `SELECT p.* FROM posts p
-       JOIN campaigns c ON c.id = p.campaign_id
+    const postRow = await dbClient.query<Post & { max_visual_attempts: number }>(
+      `SELECT p.*, COALESCE(pl.max_visual_attempts, 2) AS max_visual_attempts
+       FROM posts p
+       JOIN campaigns c        ON c.id = p.campaign_id
+       JOIN client_profiles cp ON cp.user_id = c.client_id
+       LEFT JOIN plan_limits pl ON pl.plan = cp.plan
        WHERE p.id = $1 AND c.client_id = $2`,
       [postId, clientId],
     ).then(r => r.rows[0]);
     if (!postRow) throw createError('Anuncio no encontrado', 404);
+
+    if (postRow.visual_generation_attempts >= postRow.max_visual_attempts) {
+      throw createError(
+        `Has alcanzado el límite de generaciones de imágenes de tu plan (${postRow.max_visual_attempts}/${postRow.max_visual_attempts})`,
+        403,
+        'VISUAL_LIMIT_REACHED',
+      );
+    }
 
     const strategyRow = await dbClient.query<Strategy>(
       'SELECT * FROM strategies WHERE id = $1 AND post_id = $2',

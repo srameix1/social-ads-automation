@@ -13,6 +13,7 @@ router.post('/select-plan',                               controller.selectPlan)
 router.post('/select-delivery-mode',                      controller.selectDeliveryMode);
 router.get('/profile',              controller.getMyProfile);
 router.get('/reel-usage',           controller.getReelUsage);
+router.get('/attempt-limits',       controller.getAttemptLimits);
 router.put('/profile',              controller.updateProfile);
 router.post('/profile/photos',      uploadPhotos,         controller.uploadPhotos);
 router.put('/profile/plan',                               controller.updatePlan);

@@ -121,6 +121,8 @@ export const clients = {
     }),
   getReelUsage: () =>
     request<{ used: number; quota: number }>('/clients/reel-usage'),
+  getAttemptLimits: () =>
+    request<{ maxCopyAttempts: number; maxVisualAttempts: number }>('/clients/attempt-limits'),
   updateDeliveryMode: (delivery_mode: DeliveryMode) =>
     request<{ profile: import('./types').ClientProfile }>('/clients/profile/delivery-mode', {
       method: 'PUT', body: JSON.stringify({ delivery_mode }),
@@ -331,4 +333,9 @@ export const admin = {
     request<{ success: boolean }>(`/admin/campaigns/${campaignId}/max-posts`, {
       method: 'PATCH', body: JSON.stringify({ max_posts: maxPosts }),
     }),
+  updatePostAttempts: (postId: string, data: Partial<{ copy_generation_attempts: number; visual_generation_attempts: number }>) =>
+    request<{ post: { id: string; copy_generation_attempts: number; visual_generation_attempts: number } }>(
+      `/admin/posts/${postId}/attempts`,
+      { method: 'PATCH', body: JSON.stringify(data) },
+    ),
 };

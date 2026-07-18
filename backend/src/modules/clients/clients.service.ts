@@ -220,6 +220,22 @@ export async function getReelUsage(userId: string): Promise<{ used: number; quot
   return { used: parseInt(row?.used ?? '0'), quota: parseInt(row?.quota ?? '8') };
 }
 
+export async function getAttemptLimits(userId: string): Promise<{ maxCopyAttempts: number; maxVisualAttempts: number }> {
+  const [row] = await query<{ max_copy_attempts: string; max_visual_attempts: string }>(
+    `SELECT
+       COALESCE(pl.max_copy_attempts, 5)   AS max_copy_attempts,
+       COALESCE(pl.max_visual_attempts, 2) AS max_visual_attempts
+     FROM client_profiles cp
+     LEFT JOIN plan_limits pl ON pl.plan = cp.plan
+     WHERE cp.user_id = $1`,
+    [userId],
+  );
+  return {
+    maxCopyAttempts:   parseInt(row?.max_copy_attempts ?? '5'),
+    maxVisualAttempts: parseInt(row?.max_visual_attempts ?? '2'),
+  };
+}
+
 export async function getClientById(id: string) {
   const client = await queryOne<ClientProfile & { email: string }>(
     `SELECT u.id, u.email, u.role, u.is_active, u.created_at,

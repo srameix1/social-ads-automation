@@ -85,7 +85,9 @@ export async function generateVisualsForPost(
     }
 
     await query(
-      "UPDATE posts SET workflow_status = 'visuals_ready' WHERE id = $1",
+      `UPDATE posts
+       SET workflow_status = 'visuals_ready', visual_generation_attempts = visual_generation_attempts + 1
+       WHERE id = $1`,
       [post.id],
     );
     logger.info(`[Strategy] Visuales listos — post ${post.id}`);
