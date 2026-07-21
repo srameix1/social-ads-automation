@@ -148,6 +148,30 @@ export async function enqueuePublishJobs(
 async function handlePublishPost(jobs: Array<{ data: PublishJobData }>): Promise<void> {
   const { publicationId, clientId, platform, mediaUrl, caption } = jobs[0].data;
 
+  // Si la fila ya está en 'processing' cuando pg-boss nos entrega este job, es
+  // un reintento tras un fallo a mitad de camino (ej. el servidor se reinició
+  // entre el publishTo{platform} real y el UPDATE que lo confirma en DB). No
+  // hay forma de saber si esa llamada anterior ya publicó de verdad, así que
+  // NO se vuelve a invocar publishTo{platform} — eso arriesgaría publicar dos
+  // veces en la cuenta real del cliente, algo que no se puede deshacer. Se
+  // marca 'failed' para revisión manual y no se relanza la excepción, para
+  // que pg-boss no siga reintentando solo este caso ambiguo.
+  const current = await queryOne<{ status: string }>(
+    'SELECT status FROM publications WHERE id = $1',
+    [publicationId],
+  );
+
+  if (current?.status === 'processing') {
+    logger.error(
+      `[publishPost] publicationId=${publicationId} ya estaba en 'processing' — reintento ambiguo de pg-boss, no se puede confirmar si la publicación en ${platform} ya se ejecutó. Se marca 'failed' para revisión manual en vez de arriesgar un duplicado.`,
+    );
+    await query(
+      "UPDATE publications SET status = 'failed', error_message = $1 WHERE id = $2",
+      ['Posible duplicado — verificar manualmente si ya se publicó antes de reintentar', publicationId],
+    );
+    return;
+  }
+
   try {
     await query("UPDATE publications SET status = 'processing' WHERE id = $1", [publicationId]);
     const creds = await getDecryptedCredentials(clientId, platform as 'instagram' | 'tiktok' | 'facebook');
