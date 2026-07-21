@@ -89,57 +89,77 @@ export async function enqueuePublishJobs(
 
   const boss = await getBoss();
 
+  // Cada plataforma se procesa de forma independiente: un fallo en una (ej.
+  // Instagram) no debe impedir que se intenten las demás (ej. Facebook,
+  // TikTok), igual que hacía publishConfirmedPost con su try/catch por
+  // iteración. El fallo no se traga en silencio — se acumula y, si hubo al
+  // menos uno, se lanza al final para que confirmPost se entere.
+  const failedPlatforms: string[] = [];
+
   for (const platform of post.platforms) {
-    await withTransaction(async (dbClient: PoolClient): Promise<void> => {
-      const existing = await dbClient
-        .query<{ id: string }>(
-          `SELECT id FROM publications
-           WHERE internal_post_id = $1 AND platform = $2
-             AND status IN ('pending', 'processing', 'published')
-           LIMIT 1`,
-          [post.id, platform],
-        )
-        .then((r) => r.rows[0]);
+    try {
+      await withTransaction(async (dbClient: PoolClient): Promise<void> => {
+        const existing = await dbClient
+          .query<{ id: string }>(
+            `SELECT id FROM publications
+             WHERE internal_post_id = $1 AND platform = $2
+               AND status IN ('pending', 'processing', 'published')
+             LIMIT 1`,
+            [post.id, platform],
+          )
+          .then((r) => r.rows[0]);
 
-      if (existing) {
-        logger.info(
-          `[enqueuePublishJobs] ${platform} ya tiene publication ${existing.id} activa para post ${post.id}, se omite duplicado`,
-        );
-        return;
-      }
+        if (existing) {
+          logger.info(
+            `[enqueuePublishJobs] ${platform} ya tiene publication ${existing.id} activa para post ${post.id}, se omite duplicado`,
+          );
+          return;
+        }
 
-      const publication = await dbClient
-        .query<{ id: string }>(
-          `INSERT INTO publications (internal_post_id, campaign_id, strategy_id, platform, status)
-           VALUES ($1, $2, $3, $4, 'pending')
-           ON CONFLICT (internal_post_id, platform)
-             WHERE status IN ('pending', 'processing', 'published')
-           DO NOTHING
-           RETURNING id`,
-          [post.id, post.campaign_id, post.strategy_id, platform],
-        )
-        .then((r) => r.rows[0]);
+        const publication = await dbClient
+          .query<{ id: string }>(
+            `INSERT INTO publications (internal_post_id, campaign_id, strategy_id, platform, status)
+             VALUES ($1, $2, $3, $4, 'pending')
+             ON CONFLICT (internal_post_id, platform)
+               WHERE status IN ('pending', 'processing', 'published')
+             DO NOTHING
+             RETURNING id`,
+            [post.id, post.campaign_id, post.strategy_id, platform],
+          )
+          .then((r) => r.rows[0]);
 
-      if (!publication) {
-        logger.info(
-          `[enqueuePublishJobs] ${platform} ya tiene publication activa para post ${post.id} (detectada por índice único al insertar), se omite duplicado`,
-        );
-        return;
-      }
+        if (!publication) {
+          logger.info(
+            `[enqueuePublishJobs] ${platform} ya tiene publication activa para post ${post.id} (detectada por índice único al insertar), se omite duplicado`,
+          );
+          return;
+        }
 
-      const data: PublishJobData = {
-        publicationId: publication.id, clientId, platform, mediaUrl: absoluteMediaUrl, caption,
-      };
-      // Si boss.send() lanza acá, withTransaction hace ROLLBACK del INSERT de
-      // arriba: no queda una fila 'pending' huérfana sin job real detrás.
-      const jobId = await boss.send('publish-post', data);
+        const data: PublishJobData = {
+          publicationId: publication.id, clientId, platform, mediaUrl: absoluteMediaUrl, caption,
+        };
+        // Si boss.send() lanza acá, withTransaction hace ROLLBACK del INSERT de
+        // arriba: no queda una fila 'pending' huérfana sin job real detrás.
+        const jobId = await boss.send('publish-post', data);
 
-      if (jobId) {
-        await dbClient.query('UPDATE publications SET pgboss_job_id = $1 WHERE id = $2', [jobId, publication.id]);
-      }
+        if (jobId) {
+          await dbClient.query('UPDATE publications SET pgboss_job_id = $1 WHERE id = $2', [jobId, publication.id]);
+        }
 
-      logger.info(`[enqueuePublishJobs] Encolado publish-post para post ${post.id} / ${platform} (publicationId=${publication.id})`);
-    });
+        logger.info(`[enqueuePublishJobs] Encolado publish-post para post ${post.id} / ${platform} (publicationId=${publication.id})`);
+      });
+    } catch (err) {
+      logger.error(
+        `[enqueuePublishJobs] Falló el encolado de ${platform} para post ${post.id}: ${(err as Error).message}`,
+      );
+      failedPlatforms.push(platform);
+    }
+  }
+
+  if (failedPlatforms.length > 0) {
+    throw new Error(
+      `Falló el encolado de publicación para: ${failedPlatforms.join(', ')} (post ${post.id})`,
+    );
   }
 }
 
