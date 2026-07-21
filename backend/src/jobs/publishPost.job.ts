@@ -172,6 +172,12 @@ async function handlePublishPost(jobs: Array<{ data: PublishJobData }>): Promise
     return;
   }
 
+  // true desde el instante en que publishTo{platform} confirma éxito real en
+  // la red social. Si algo falla DESPUÉS de eso (el UPDATE de resultado, el
+  // sendAfter del chequeo de TikTok), el catch de abajo necesita saberlo para
+  // no relanzar y no arriesgar que pg-boss vuelva a publicar un duplicado.
+  let alreadyPublished = false;
+
   try {
     await query("UPDATE publications SET status = 'processing' WHERE id = $1", [publicationId]);
     const creds = await getDecryptedCredentials(clientId, platform as 'instagram' | 'tiktok' | 'facebook');
@@ -182,6 +188,7 @@ async function handlePublishPost(jobs: Array<{ data: PublishJobData }>): Promise
       // final del video) — acá solo usamos su postId (== publish_id) y encadenamos
       // el chequeo de estado real en vez de confiar en esa URL.
       const { postId: publishId } = await publishToTikTok(tiktokCreds, mediaUrl, caption);
+      alreadyPublished = true;
       await query('UPDATE publications SET post_id = $1 WHERE id = $2', [publishId, publicationId]);
 
       const boss = await getBoss();
@@ -201,6 +208,7 @@ async function handlePublishPost(jobs: Array<{ data: PublishJobData }>): Promise
     } else {
       throw new Error(`Plataforma no soportada: ${platform}`);
     }
+    alreadyPublished = true;
 
     await query(
       `UPDATE publications SET status = 'published', post_id = $1, post_url = $2, published_at = NOW() WHERE id = $3`,
@@ -209,6 +217,22 @@ async function handlePublishPost(jobs: Array<{ data: PublishJobData }>): Promise
     logger.info(`[publishPost] Post publicado en ${platform} (publicationId=${publicationId})`);
   } catch (err) {
     const message = (err as Error).message;
+
+    if (alreadyPublished) {
+      // Ya se publicó de verdad en ${platform}; el error ocurrió después (al
+      // confirmarlo en DB o al encolar el chequeo de TikTok). Relanzar haría
+      // que pg-boss reintente y vuelva a llamar a publishTo{platform},
+      // duplicando la publicación real. Se deja para revisión manual.
+      logger.error(
+        `[publishPost] publicationId=${publicationId} publicó en ${platform} pero falló la confirmación posterior: ${message}. Se marca 'failed' para revisión manual, no se reintenta.`,
+      );
+      await query(
+        "UPDATE publications SET status = 'failed', error_message = $1 WHERE id = $2",
+        ['Publicación posiblemente exitosa pero no se pudo confirmar en la base de datos — revisar manualmente antes de reintentar', publicationId],
+      );
+      return; // no relanzar: corta el reintento automático de pg-boss
+    }
+
     await query(
       "UPDATE publications SET status = 'failed', error_message = $1 WHERE id = $2",
       [message, publicationId],
