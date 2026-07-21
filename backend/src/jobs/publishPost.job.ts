@@ -1,4 +1,5 @@
-import { query, queryOne } from '../config/database';
+import { PoolClient } from 'pg';
+import { query, queryOne, withTransaction } from '../config/database';
 import { getBoss } from '../config/pgboss';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
@@ -46,6 +47,16 @@ interface TikTokCheckJobData {
 // Reemplaza el setImmediate(() => publishConfirmedPost(...)) fire-and-forget:
 // la fila 'pending' + el job quedan escritos en Postgres antes de devolver
 // la respuesta al cliente, así que sobreviven un reinicio del servidor.
+//
+// Idempotente por (internal_post_id, platform): si confirmPost() se reintenta
+// después de que esta función falló a mitad de camino (algunas plataformas
+// ya encoladas, otras no), no debe duplicar las que ya quedaron 'pending'/
+// 'processing'/'published'. El SELECT previo cubre el caso normal (reintento
+// secuencial); el ON CONFLICT contra el índice único parcial
+// idx_publications_post_platform_active (migración 026) cubre la ventana de
+// carrera si dos confirmaciones llegan casi simultáneas. Cada plataforma se
+// procesa en su propia transacción para que, si boss.send() falla después
+// del INSERT, el rollback deshaga esa fila en vez de dejarla huérfana.
 
 export async function enqueuePublishJobs(
   post:         ConfirmedPost,
@@ -79,23 +90,56 @@ export async function enqueuePublishJobs(
   const boss = await getBoss();
 
   for (const platform of post.platforms) {
-    const [publication] = await query<{ id: string }>(
-      `INSERT INTO publications (internal_post_id, campaign_id, strategy_id, platform, status)
-       VALUES ($1, $2, $3, $4, 'pending')
-       RETURNING id`,
-      [post.id, post.campaign_id, post.strategy_id, platform],
-    );
+    await withTransaction(async (dbClient: PoolClient): Promise<void> => {
+      const existing = await dbClient
+        .query<{ id: string }>(
+          `SELECT id FROM publications
+           WHERE internal_post_id = $1 AND platform = $2
+             AND status IN ('pending', 'processing', 'published')
+           LIMIT 1`,
+          [post.id, platform],
+        )
+        .then((r) => r.rows[0]);
 
-    const data: PublishJobData = {
-      publicationId: publication.id, clientId, platform, mediaUrl: absoluteMediaUrl, caption,
-    };
-    const jobId = await boss.send('publish-post', data);
+      if (existing) {
+        logger.info(
+          `[enqueuePublishJobs] ${platform} ya tiene publication ${existing.id} activa para post ${post.id}, se omite duplicado`,
+        );
+        return;
+      }
 
-    if (jobId) {
-      await query('UPDATE publications SET pgboss_job_id = $1 WHERE id = $2', [jobId, publication.id]);
-    }
+      const publication = await dbClient
+        .query<{ id: string }>(
+          `INSERT INTO publications (internal_post_id, campaign_id, strategy_id, platform, status)
+           VALUES ($1, $2, $3, $4, 'pending')
+           ON CONFLICT (internal_post_id, platform)
+             WHERE status IN ('pending', 'processing', 'published')
+           DO NOTHING
+           RETURNING id`,
+          [post.id, post.campaign_id, post.strategy_id, platform],
+        )
+        .then((r) => r.rows[0]);
 
-    logger.info(`[enqueuePublishJobs] Encolado publish-post para post ${post.id} / ${platform} (publicationId=${publication.id})`);
+      if (!publication) {
+        logger.info(
+          `[enqueuePublishJobs] ${platform} ya tiene publication activa para post ${post.id} (detectada por índice único al insertar), se omite duplicado`,
+        );
+        return;
+      }
+
+      const data: PublishJobData = {
+        publicationId: publication.id, clientId, platform, mediaUrl: absoluteMediaUrl, caption,
+      };
+      // Si boss.send() lanza acá, withTransaction hace ROLLBACK del INSERT de
+      // arriba: no queda una fila 'pending' huérfana sin job real detrás.
+      const jobId = await boss.send('publish-post', data);
+
+      if (jobId) {
+        await dbClient.query('UPDATE publications SET pgboss_job_id = $1 WHERE id = $2', [jobId, publication.id]);
+      }
+
+      logger.info(`[enqueuePublishJobs] Encolado publish-post para post ${post.id} / ${platform} (publicationId=${publication.id})`);
+    });
   }
 }
 
