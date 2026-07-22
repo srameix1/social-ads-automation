@@ -30,6 +30,11 @@ export async function publishToTikTok(
 ): Promise<PublishResult> {
   const { access_token, open_id } = credentials;
 
+  // Apps sin auditar por TikTok solo pueden publicar en SELF_ONLY —
+  // PUBLIC_TO_EVERYONE es rechazado con "unaudited_client_can_only_post_to_private_accounts".
+  // Default seguro: SELF_ONLY, salvo que TIKTOK_APP_AUDITED='true' esté seteado explícitamente.
+  const privacyLevel = process.env.TIKTOK_APP_AUDITED === 'true' ? 'PUBLIC_TO_EVERYONE' : 'SELF_ONLY';
+
   // Paso 1: Iniciar la subida del video por URL
   const initRes = await fetch(`${TIKTOK_API}/post/publish/video/init/`, {
     method: 'POST',
@@ -40,7 +45,7 @@ export async function publishToTikTok(
     body: JSON.stringify({
       post_info: {
         title:            caption.slice(0, 150),
-        privacy_level:    'PUBLIC_TO_EVERYONE',
+        privacy_level:    privacyLevel,
         disable_duet:     false,
         disable_comment:  false,
         disable_stitch:   false,
