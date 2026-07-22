@@ -252,7 +252,9 @@ export async function handleTikTokCallback(code: string, stateStr: string): Prom
     const err = await tokenRes.text();
     throw new Error(`TikTok token exchange failed: ${err}`);
   }
-  const tokenData = await tokenRes.json() as {
+  const rawText = await tokenRes.text();
+  logger.error(`TikTok raw token response: ${rawText}`);
+  const tokenData = JSON.parse(rawText) as {
     data: {
       access_token:       string;
       refresh_token:      string;
