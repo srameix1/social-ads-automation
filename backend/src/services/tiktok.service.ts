@@ -35,6 +35,24 @@ export async function publishToTikTok(
   // Default seguro: SELF_ONLY, salvo que TIKTOK_APP_AUDITED='true' esté seteado explícitamente.
   const privacyLevel = process.env.TIKTOK_APP_AUDITED === 'true' ? 'PUBLIC_TO_EVERYONE' : 'SELF_ONLY';
 
+  logger.error(`TikTok privacy_level debug: env=${process.env.TIKTOK_APP_AUDITED} privacyLevel=${privacyLevel}`);
+
+  const initBody = {
+    post_info: {
+      title:            caption.slice(0, 150),
+      privacy_level:    privacyLevel,
+      disable_duet:     false,
+      disable_comment:  false,
+      disable_stitch:   false,
+    },
+    source_info: {
+      source:    'PULL_FROM_URL',
+      video_url: videoUrl,
+    },
+  };
+
+  logger.error(`TikTok init request body: ${JSON.stringify(initBody)}`);
+
   // Paso 1: Iniciar la subida del video por URL
   const initRes = await fetch(`${TIKTOK_API}/post/publish/video/init/`, {
     method: 'POST',
@@ -42,19 +60,7 @@ export async function publishToTikTok(
       'Authorization': `Bearer ${access_token}`,
       'Content-Type':  'application/json; charset=UTF-8',
     },
-    body: JSON.stringify({
-      post_info: {
-        title:            caption.slice(0, 150),
-        privacy_level:    privacyLevel,
-        disable_duet:     false,
-        disable_comment:  false,
-        disable_stitch:   false,
-      },
-      source_info: {
-        source:    'PULL_FROM_URL',
-        video_url: videoUrl,
-      },
-    }),
+    body: JSON.stringify(initBody),
   });
 
   if (!initRes.ok) {
