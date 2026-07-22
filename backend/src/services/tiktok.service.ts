@@ -59,6 +59,7 @@ export async function publishToTikTok(
 
   if (!initRes.ok) {
     const err = await initRes.json() as { error?: { message: string } };
+    logger.error(`TikTok init error full: ${JSON.stringify(err)}`);
     throw new Error(`TikTok init error: ${err.error?.message ?? initRes.statusText}`);
   }
 
