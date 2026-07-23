@@ -241,7 +241,14 @@ export async function publishToSocialMedia(
       const r = await publishToInstagram(creds as unknown as Parameters<typeof publishToInstagram>[0], absoluteMediaUrl, caption);
       postId = r.postId; postUrl = r.postUrl;
     } else if (platform === 'tiktok') {
-      const r = await publishToTikTok(creds as unknown as Parameters<typeof publishToTikTok>[0], absoluteMediaUrl, caption);
+      // Detección por extensión, igual que Facebook/Instagram más abajo — no por
+      // media_assets.type, que en plan 'basic' queda hardcodeado a 'video' aunque
+      // el archivo real para TikTok sea el basic_story.jpg (ver publishVariation).
+      const isVideo = /\.(mp4|mov)$/i.test(absoluteMediaUrl);
+      const r = await publishToTikTok(
+        creds as unknown as Parameters<typeof publishToTikTok>[0],
+        absoluteMediaUrl, caption, isVideo ? 'video' : 'image',
+      );
       postId = r.postId; postUrl = r.postUrl;
     } else if (platform === 'facebook') {
       const r = await publishToFacebook(creds as unknown as Parameters<typeof publishToFacebook>[0], absoluteMediaUrl, caption);

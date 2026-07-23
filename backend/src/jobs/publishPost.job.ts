@@ -5,7 +5,7 @@ import { env } from '../config/env';
 import { logger } from '../utils/logger';
 import { getDecryptedCredentials } from '../modules/credentials/credentials.service';
 import { publishToInstagram } from '../services/instagram.service';
-import { publishToTikTok, checkTikTokPublishStatus, TikTokCredentials } from '../services/tiktok.service';
+import { publishToTikTok, checkTikTokPublishStatus, TikTokCredentials, TikTokMediaType } from '../services/tiktok.service';
 import { publishToFacebook } from '../services/facebook.service';
 
 type Boss = Awaited<ReturnType<typeof getBoss>>;
@@ -25,6 +25,7 @@ interface ConfirmedPost {
   strategy_id:         string | null;
   visual_variation_id: string | null;
   platforms:           string[];
+  format:              'image' | 'animated_video' | 'reel';
 }
 
 interface PublishJobData {
@@ -33,6 +34,7 @@ interface PublishJobData {
   platform:      string;
   mediaUrl:      string;
   caption:       string;
+  mediaType:     TikTokMediaType;
 }
 
 interface TikTokCheckJobData {
@@ -40,6 +42,7 @@ interface TikTokCheckJobData {
   clientId:      string;
   publishId:     string;
   openId:        string;
+  mediaType:     TikTokMediaType;
   attempt:       number;
 }
 
@@ -86,6 +89,7 @@ export async function enqueuePublishJobs(
   );
   const caption = strategy?.copy_text ?? '';
   const absoluteMediaUrl = mediaUrl.startsWith('/') ? `${env.BACKEND_URL}${mediaUrl}` : mediaUrl;
+  const mediaType: TikTokMediaType = post.format === 'image' ? 'image' : 'video';
 
   const boss = await getBoss();
 
@@ -136,7 +140,7 @@ export async function enqueuePublishJobs(
         }
 
         const data: PublishJobData = {
-          publicationId: publication.id, clientId, platform, mediaUrl: absoluteMediaUrl, caption,
+          publicationId: publication.id, clientId, platform, mediaUrl: absoluteMediaUrl, caption, mediaType,
         };
         // Si boss.send() lanza acá, withTransaction hace ROLLBACK del INSERT de
         // arriba: no queda una fila 'pending' huérfana sin job real detrás.
@@ -166,7 +170,7 @@ export async function enqueuePublishJobs(
 // ── Worker: publish-post ────────────────────────────────────────────────────
 
 async function handlePublishPost(jobs: Array<{ data: PublishJobData }>): Promise<void> {
-  const { publicationId, clientId, platform, mediaUrl, caption } = jobs[0].data;
+  const { publicationId, clientId, platform, mediaUrl, caption, mediaType } = jobs[0].data;
 
   // Si la fila ya está en 'processing' cuando pg-boss nos entrega este job, es
   // un reintento tras un fallo a mitad de camino (ej. el servidor se reinició
@@ -207,13 +211,13 @@ async function handlePublishPost(jobs: Array<{ data: PublishJobData }>): Promise
       // publishToTikTok ya arma un postUrl con publish_id (transaccional, no el ID
       // final del video) — acá solo usamos su postId (== publish_id) y encadenamos
       // el chequeo de estado real en vez de confiar en esa URL.
-      const { postId: publishId } = await publishToTikTok(tiktokCreds, mediaUrl, caption);
+      const { postId: publishId } = await publishToTikTok(tiktokCreds, mediaUrl, caption, mediaType);
       alreadyPublished = true;
       await query('UPDATE publications SET post_id = $1 WHERE id = $2', [publishId, publicationId]);
 
       const boss = await getBoss();
       const data: TikTokCheckJobData = {
-        publicationId, clientId, publishId, openId: tiktokCreds.open_id, attempt: 0,
+        publicationId, clientId, publishId, openId: tiktokCreds.open_id, mediaType, attempt: 0,
       };
       await boss.sendAfter('tiktok-check-status', data, null, TIKTOK_CHECK_BACKOFF_BASE_SECS);
       logger.info(`[publishPost] TikTok publish_id=${publishId} — esperando confirmación (publicationId=${publicationId})`);
@@ -265,13 +269,13 @@ async function handlePublishPost(jobs: Array<{ data: PublishJobData }>): Promise
 // ── Worker: tiktok-check-status (cadena de sendAfter) ──────────────────────
 
 async function handleTikTokCheckStatus(jobs: Array<{ data: TikTokCheckJobData }>): Promise<void> {
-  const { publicationId, clientId, publishId, openId, attempt } = jobs[0].data;
+  const { publicationId, clientId, publishId, openId, mediaType, attempt } = jobs[0].data;
 
   const creds = await getDecryptedCredentials(clientId, 'tiktok') as unknown as TikTokCredentials;
   const result = await checkTikTokPublishStatus(creds, publishId);
 
   if (result.status === 'PUBLISH_COMPLETE' && result.postId) {
-    const postUrl = `https://www.tiktok.com/@${openId}/video/${result.postId}`;
+    const postUrl = `https://www.tiktok.com/@${openId}/${mediaType === 'image' ? 'photo' : 'video'}/${result.postId}`;
     await query(
       `UPDATE publications SET status = 'published', post_id = $1, post_url = $2, published_at = NOW() WHERE id = $3`,
       [result.postId, postUrl, publicationId],
@@ -304,7 +308,7 @@ async function handleTikTokCheckStatus(jobs: Array<{ data: TikTokCheckJobData }>
     TIKTOK_CHECK_BACKOFF_BASE_SECS * 2 ** nextAttempt,
     TIKTOK_CHECK_BACKOFF_CAP_SECS,
   );
-  const data: TikTokCheckJobData = { publicationId, clientId, publishId, openId, attempt: nextAttempt };
+  const data: TikTokCheckJobData = { publicationId, clientId, publishId, openId, mediaType, attempt: nextAttempt };
   await boss.sendAfter('tiktok-check-status', data, null, delaySeconds);
   logger.debug(`[tiktokCheckStatus] Sigue en ${result.status} — próximo chequeo en ${delaySeconds}s (intento ${nextAttempt})`);
 }

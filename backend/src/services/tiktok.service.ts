@@ -1,12 +1,14 @@
 /**
- * TikTok Content Posting API — publica video en la cuenta del cliente.
+ * TikTok Content Posting API — publica video o foto en la cuenta del cliente.
  * Docs: https://developers.tiktok.com/doc/content-posting-api-get-started
+ * Fotos: https://developers.tiktok.com/doc/content-posting-api-reference-photo-post
  *
  * Credenciales requeridas (se guardan cifradas en client_credentials):
  *   access_token: OAuth 2.0 access token
  *   open_id:      ID único del usuario en TikTok
  *
- * Nota: TikTok solo acepta videos (no imágenes estáticas).
+ * Video y foto usan endpoints /init/ distintos (/video/init/ vs /content/init/)
+ * con cuerpos de request distintos — ver publishToTikTok.
  */
 
 import { logger } from '../utils/logger';
@@ -23,10 +25,13 @@ export interface PublishResult {
   postUrl: string;
 }
 
+export type TikTokMediaType = 'image' | 'video';
+
 export async function publishToTikTok(
   credentials: TikTokCredentials,
-  videoUrl:    string,
+  mediaUrl:    string,
   caption:     string,
+  mediaType:   TikTokMediaType,
 ): Promise<PublishResult> {
   const { access_token, open_id } = credentials;
 
@@ -35,26 +40,48 @@ export async function publishToTikTok(
   // Default seguro: SELF_ONLY, salvo que TIKTOK_APP_AUDITED='true' esté seteado explícitamente.
   const privacyLevel = process.env.TIKTOK_APP_AUDITED === 'true' ? 'PUBLIC_TO_EVERYONE' : 'SELF_ONLY';
 
-  logger.error(`TikTok privacy_level debug: env=${process.env.TIKTOK_APP_AUDITED} privacyLevel=${privacyLevel}`);
+  logger.error(`TikTok privacy_level debug: env=${process.env.TIKTOK_APP_AUDITED} privacyLevel=${privacyLevel} mediaType=${mediaType}`);
 
-  const initBody = {
-    post_info: {
-      title:            caption.slice(0, 150),
-      privacy_level:    privacyLevel,
-      disable_duet:     false,
-      disable_comment:  false,
-      disable_stitch:   false,
-    },
-    source_info: {
-      source:    'PULL_FROM_URL',
-      video_url: videoUrl,
-    },
-  };
+  // Video y foto son endpoints distintos con cuerpos distintos — TikTok
+  // rechaza el init de video con un .jpg (y viceversa) en el chequeo async
+  // de estado ("duration_check"), no en el init mismo.
+  const initEndpoint = mediaType === 'image'
+    ? `${TIKTOK_API}/post/publish/content/init/`
+    : `${TIKTOK_API}/post/publish/video/init/`;
+
+  const initBody = mediaType === 'image'
+    ? {
+        post_info: {
+          title:           caption.slice(0, 150),
+          privacy_level:   privacyLevel,
+          disable_comment: false,
+        },
+        source_info: {
+          source:             'PULL_FROM_URL',
+          photo_cover_index:  0,
+          photo_images:       [mediaUrl],
+        },
+        post_mode:  'DIRECT_POST',
+        media_type: 'PHOTO',
+      }
+    : {
+        post_info: {
+          title:            caption.slice(0, 150),
+          privacy_level:    privacyLevel,
+          disable_duet:     false,
+          disable_comment:  false,
+          disable_stitch:   false,
+        },
+        source_info: {
+          source:    'PULL_FROM_URL',
+          video_url: mediaUrl,
+        },
+      };
 
   logger.error(`TikTok init request body: ${JSON.stringify(initBody)}`);
 
-  // Paso 1: Iniciar la subida del video por URL
-  const initRes = await fetch(`${TIKTOK_API}/post/publish/video/init/`, {
+  // Paso 1: Iniciar la subida del video/foto por URL
+  const initRes = await fetch(initEndpoint, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${access_token}`,
@@ -72,9 +99,9 @@ export async function publishToTikTok(
   const initData = await initRes.json() as { data: { publish_id: string } };
   const publishId = initData.data.publish_id;
 
-  logger.info('[TikTok] Video publicado con publish_id:', publishId);
+  logger.info(`[TikTok] ${mediaType} publicado con publish_id:`, publishId);
 
-  const postUrl = `https://www.tiktok.com/@${open_id}/video/${publishId}`;
+  const postUrl = `https://www.tiktok.com/@${open_id}/${mediaType === 'image' ? 'photo' : 'video'}/${publishId}`;
   return { postId: publishId, postUrl };
 }
 
