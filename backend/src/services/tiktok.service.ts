@@ -53,6 +53,7 @@ export async function publishToTikTok(
     ? {
         post_info: {
           title:           caption.slice(0, 150),
+          description:     caption,
           privacy_level:   privacyLevel,
           disable_comment: false,
         },
