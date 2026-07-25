@@ -10,7 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { SanaddsLogo } from '@/components/ui/Logo';
 import { clients, credentials } from '@/lib/api';
 
-const ONBOARDING_EXEMPT = ['/select-plan', '/delivery-mode', '/connect'];
+const ONBOARDING_EXEMPT = ['/select-plan', '/delivery-mode', '/connect', '/profile'];
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
