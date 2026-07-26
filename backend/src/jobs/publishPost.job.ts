@@ -274,8 +274,10 @@ async function handleTikTokCheckStatus(jobs: Array<{ data: TikTokCheckJobData }>
   const creds = await getDecryptedCredentials(clientId, 'tiktok') as unknown as TikTokCredentials;
   const result = await checkTikTokPublishStatus(creds, publishId);
 
-  if (result.status === 'PUBLISH_COMPLETE' && result.postId) {
-    const postUrl = `https://www.tiktok.com/@${openId}/${mediaType === 'image' ? 'photo' : 'video'}/${result.postId}`;
+  if (result.status === 'PUBLISH_COMPLETE') {
+    const postUrl = result.postId
+      ? `https://www.tiktok.com/@${openId}/${mediaType === 'image' ? 'photo' : 'video'}/${result.postId}`
+      : null;
     await query(
       `UPDATE publications SET status = 'published', post_id = $1, post_url = $2, published_at = NOW() WHERE id = $3`,
       [result.postId, postUrl, publicationId],

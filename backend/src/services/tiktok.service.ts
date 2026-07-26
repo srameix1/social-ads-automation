@@ -153,13 +153,13 @@ export async function checkTikTokPublishStatus(
   const data = await res.json() as {
     data: {
       status?: TikTokPublishStatus;
-      publicly_available_post_id?: number[];
+      publicaly_available_post_id?: number[];
       fail_reason?: string;
     };
   };
 
   const status = data.data.status ?? 'FAILED';
-  const postId = data.data.publicly_available_post_id?.[0]?.toString() ?? null;
+  const postId = data.data.publicaly_available_post_id?.[0]?.toString() ?? null;
 
   logger.debug(`[TikTok] Estado de publish_id ${publishId}: ${status}`);
 
