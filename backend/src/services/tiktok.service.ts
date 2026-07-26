@@ -158,6 +158,8 @@ export async function checkTikTokPublishStatus(
     };
   };
 
+  logger.error(`TikTok status check raw: ${JSON.stringify(data)}`);
+
   const status = data.data.status ?? 'FAILED';
   const postId = data.data.publicaly_available_post_id?.[0]?.toString() ?? null;
 
