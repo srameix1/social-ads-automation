@@ -52,7 +52,7 @@ export async function publishToTikTok(
   const initBody = mediaType === 'image'
     ? {
         post_info: {
-          title:           caption.slice(0, 150),
+          title:           caption.slice(0, 90),
           description:     caption,
           privacy_level:   privacyLevel,
           disable_comment: false,
