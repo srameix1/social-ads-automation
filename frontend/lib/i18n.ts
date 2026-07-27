@@ -135,6 +135,9 @@ const es: Dict = {
   // Logo
   logo_tagline: 'Publicidad social con IA',
 
+  // Trial quota banner (dashboard + posts/new)
+  trial_posts_left: (n: number) => `Te quedan ${n} publicaciones de prueba.`,
+
   // Login
   login_welcome:    'Bienvenido',
   login_subtitle:   'Ingresa a tu panel de control',
@@ -628,6 +631,9 @@ const en: Dict = {
   // Logo
   logo_tagline: 'AI Social Advertising',
 
+  // Trial quota banner (dashboard + posts/new)
+  trial_posts_left: (n: number) => `You have ${n} trial posts left.`,
+
   // Login
   login_welcome:    'Welcome back',
   login_subtitle:   'Sign in to your dashboard',
@@ -1120,6 +1126,9 @@ const pt: Dict = {
 
   // Logo
   logo_tagline: 'Publicidade social com IA',
+
+  // Trial quota banner (dashboard + posts/new)
+  trial_posts_left: (n: number) => `Restam ${n} publicações de teste.`,
 
   // Login
   login_welcome:    'Bem-vindo',

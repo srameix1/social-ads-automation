@@ -402,7 +402,7 @@ export default function NewPostPage() {
 
       {isTrial && !trialLimitReached && (
         <div className="px-4 py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 text-sm text-amber-300">
-          Te quedan {Math.max(trialPostsLimit - trialPostsUsed, 0)} publicaciones de prueba.
+          {t('trial_posts_left', Math.max(trialPostsLimit - trialPostsUsed, 0))}
         </div>
       )}
 
