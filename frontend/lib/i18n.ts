@@ -123,6 +123,10 @@ const es: Dict = {
   trial_whatsapp_cta:     'Escribir por WhatsApp',
   trial_view_plans:       'Ver planes',
 
+  // PublicationResult
+  pub_view_post: 'Ver post →',
+  pub_pending:   'Pendiente',
+
   // Login
   login_welcome:    'Bienvenido',
   login_subtitle:   'Ingresa a tu panel de control',
@@ -604,6 +608,10 @@ const en: Dict = {
   trial_whatsapp_cta:     'Message us on WhatsApp',
   trial_view_plans:       'View plans',
 
+  // PublicationResult
+  pub_view_post: 'View post →',
+  pub_pending:   'Pending',
+
   // Login
   login_welcome:    'Welcome back',
   login_subtitle:   'Sign in to your dashboard',
@@ -1084,6 +1092,10 @@ const pt: Dict = {
   trial_limit_sub:        'Você já usou todas as suas publicações de teste. Fale conosco pelo WhatsApp ou escolha um plano para continuar criando anúncios.',
   trial_whatsapp_cta:     'Falar pelo WhatsApp',
   trial_view_plans:       'Ver planos',
+
+  // PublicationResult
+  pub_view_post: 'Ver post →',
+  pub_pending:   'Pendente',
 
   // Login
   login_welcome:    'Bem-vindo',
