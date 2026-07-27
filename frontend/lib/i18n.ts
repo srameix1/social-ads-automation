@@ -132,6 +132,9 @@ const es: Dict = {
   input_show_password: 'Mostrar contraseña',
   page_loading:        'Cargando...',
 
+  // Logo
+  logo_tagline: 'Publicidad social con IA',
+
   // Login
   login_welcome:    'Bienvenido',
   login_subtitle:   'Ingresa a tu panel de control',
@@ -622,6 +625,9 @@ const en: Dict = {
   input_show_password: 'Show password',
   page_loading:        'Loading...',
 
+  // Logo
+  logo_tagline: 'AI Social Advertising',
+
   // Login
   login_welcome:    'Welcome back',
   login_subtitle:   'Sign in to your dashboard',
@@ -1111,6 +1117,9 @@ const pt: Dict = {
   input_hide_password: 'Ocultar senha',
   input_show_password: 'Mostrar senha',
   page_loading:        'Carregando...',
+
+  // Logo
+  logo_tagline: 'Publicidade social com IA',
 
   // Login
   login_welcome:    'Bem-vindo',

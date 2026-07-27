@@ -1,6 +1,7 @@
 'use client';
 
 import { useId } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface IconProps {
   className?: string;
@@ -114,6 +115,7 @@ export function SanaddsLogo({ size = 'md', className = '' }: LogoProps) {
  * Advertising" caption in small-caps.
  */
 export function SanaddsHero({ className = '' }: { className?: string }) {
+  const { t } = useLanguage();
   return (
     <div className={`flex flex-col items-center gap-5 ${className}`}>
       {/* Glow ring behind icon */}
@@ -129,7 +131,7 @@ export function SanaddsHero({ className = '' }: { className?: string }) {
           <span className="text-white">Flow</span>
         </div>
         <p className="mt-2.5 text-[10px] font-semibold tracking-[0.32em] uppercase text-slate-500">
-          AI Social Advertising
+          {t('logo_tagline')}
         </p>
       </div>
     </div>
