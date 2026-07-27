@@ -83,6 +83,13 @@ const es: Dict = {
   select_plan_sub_trial_ended:  'Ya usaste todas tus publicaciones de prueba. Elige un plan para seguir creando anuncios sin límite.',
   select_plan_cta:              'Seleccionar plan',
 
+  // Facebook page selector
+  fb_pages_invalid_token: 'Token de selección inválido o expirado.',
+  fb_pages_title:         'Selecciona tu Página de Facebook',
+  fb_pages_sub:           'Encontramos múltiples Páginas en tu cuenta. Elige cuál deseas usar para publicar.',
+  fb_pages_empty:         'No se encontraron páginas pendientes. Vuelve a intentar la conexión.',
+  fb_pages_id:            (id: string) => `ID: ${id}`,
+
   // Login
   login_welcome:    'Bienvenido',
   login_subtitle:   'Ingresa a tu panel de control',
@@ -524,6 +531,13 @@ const en: Dict = {
   select_plan_sub_trial_ended:  "You've used all your trial posts. Choose a plan to keep creating ads without limits.",
   select_plan_cta:              'Select plan',
 
+  // Facebook page selector
+  fb_pages_invalid_token: 'Invalid or expired selection token.',
+  fb_pages_title:         'Select your Facebook Page',
+  fb_pages_sub:           'We found multiple Pages in your account. Choose which one you want to use for publishing.',
+  fb_pages_empty:         'No pending pages found. Try connecting again.',
+  fb_pages_id:            (id: string) => `ID: ${id}`,
+
   // Login
   login_welcome:    'Welcome back',
   login_subtitle:   'Sign in to your dashboard',
@@ -964,6 +978,13 @@ const pt: Dict = {
   select_plan_sub:              'Selecione o plano que melhor se adapta ao seu negócio para começar.',
   select_plan_sub_trial_ended:  'Você já usou todas as suas publicações de teste. Escolha um plano para continuar criando anúncios sem limite.',
   select_plan_cta:              'Selecionar plano',
+
+  // Facebook page selector
+  fb_pages_invalid_token: 'Token de seleção inválido ou expirado.',
+  fb_pages_title:         'Selecione sua Página do Facebook',
+  fb_pages_sub:           'Encontramos várias Páginas na sua conta. Escolha qual você quer usar para publicar.',
+  fb_pages_empty:         'Nenhuma página pendente encontrada. Tente conectar novamente.',
+  fb_pages_id:            (id: string) => `ID: ${id}`,
 
   // Login
   login_welcome:    'Bem-vindo',

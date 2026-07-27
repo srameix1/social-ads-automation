@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { oauth } from '@/lib/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function FacebookPageSelectorPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { t } = useLanguage();
   const token  = searchParams.get('token') ?? '';
 
   const [pages, setPages]       = useState<Array<{ id: string; name: string }>>([]);
@@ -15,11 +17,12 @@ export default function FacebookPageSelectorPage() {
   const [error, setError]       = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token) { setError('Token de selección inválido o expirado.'); setLoading(false); return; }
+    if (!token) { setError(t('fb_pages_invalid_token')); setLoading(false); return; }
     oauth.getFacebookPages(token)
       .then(({ pages }) => setPages(pages))
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   async function selectPage(pageId: string) {
@@ -36,9 +39,9 @@ export default function FacebookPageSelectorPage() {
   return (
     <div className="max-w-lg mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white mb-1">Selecciona tu Página de Facebook</h1>
+        <h1 className="text-2xl font-bold text-white mb-1">{t('fb_pages_title')}</h1>
         <p className="text-slate-400 text-sm">
-          Encontramos múltiples Páginas en tu cuenta. Elige cuál deseas usar para publicar.
+          {t('fb_pages_sub')}
         </p>
       </div>
 
@@ -49,7 +52,7 @@ export default function FacebookPageSelectorPage() {
             onClick={() => router.push('/connect')}
             className="block mt-2 text-xs text-red-300 hover:text-red-200 underline"
           >
-            Volver a intentar
+            {t('post_retry')}
           </button>
         </div>
       )}
@@ -63,7 +66,7 @@ export default function FacebookPageSelectorPage() {
       )}
 
       {!loading && !error && pages.length === 0 && (
-        <p className="text-slate-500 text-sm">No se encontraron páginas pendientes. Vuelve a intentar la conexión.</p>
+        <p className="text-slate-500 text-sm">{t('fb_pages_empty')}</p>
       )}
 
       <div className="space-y-3">
@@ -83,7 +86,7 @@ export default function FacebookPageSelectorPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-white truncate">{page.name}</p>
-              <p className="text-xs text-slate-500">ID: {page.id}</p>
+              <p className="text-xs text-slate-500">{t('fb_pages_id', page.id)}</p>
             </div>
             {selecting === page.id ? (
               <svg className="w-4 h-4 text-brand-400 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
