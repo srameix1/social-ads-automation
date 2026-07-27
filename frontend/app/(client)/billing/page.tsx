@@ -5,18 +5,24 @@ import { useSearchParams } from 'next/navigation';
 import { billing } from '@/lib/api';
 import { PLAN_DETAILS } from '@/lib/types';
 import type { ServicePlan, SubscriptionStatus } from '@/lib/types';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LOCALE_MAP } from '@/lib/i18n';
 
 const PLAN_ORDER: ServicePlan[] = ['basic', 'professional', 'premium'];
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  active:    { label: 'Activo',    color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
-  inactive:  { label: 'Inactivo',  color: 'text-slate-400 bg-slate-500/10 border-slate-500/20' },
-  past_due:  { label: 'Pago vencido', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
-  cancelled: { label: 'Cancelado', color: 'text-red-400 bg-red-500/10 border-red-500/20' },
-};
+function useStatusLabels(t: (key: string, ...args: any[]) => string): Record<string, { label: string; color: string }> {
+  return {
+    active:    { label: t('billing_status_active'),    color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+    inactive:  { label: t('billing_status_inactive'),  color: 'text-slate-400 bg-slate-500/10 border-slate-500/20' },
+    past_due:  { label: t('billing_status_past_due'),  color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
+    cancelled: { label: t('billing_status_cancelled'), color: 'text-red-400 bg-red-500/10 border-red-500/20' },
+  };
+}
 
 export default function BillingPage() {
   const searchParams = useSearchParams();
+  const { lang, t } = useLanguage();
+  const STATUS_LABELS = useStatusLabels(t);
   const [status, setStatus]     = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading]   = useState(true);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
@@ -31,9 +37,10 @@ export default function BillingPage() {
 
   useEffect(() => {
     if (searchParams.get('cancelled') === 'true') {
-      setNotification({ type: 'error', message: 'Pago cancelado. Puedes intentarlo de nuevo cuando quieras.' });
+      setNotification({ type: 'error', message: t('billing_payment_cancelled_msg') });
       window.history.replaceState({}, '', '/billing');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   useEffect(() => {
@@ -65,14 +72,14 @@ export default function BillingPage() {
   }
 
   async function handleCancelSubscription() {
-    if (!window.confirm('¿Cancelar tu suscripción? Seguirás teniendo acceso hasta el fin del período que ya pagaste, y no se te volverá a cobrar.')) {
+    if (!window.confirm(t('billing_cancel_confirm'))) {
       return;
     }
     setActionBusy('cancel');
     try {
       const { currentPeriodEnd } = await billing.cancelSubscription();
       setStatus(prev => prev && { ...prev, cancelAtPeriodEnd: true, currentPeriodEnd: currentPeriodEnd ?? prev.currentPeriodEnd });
-      setNotification({ type: 'success', message: 'Tu suscripción se cancelará al final del período actual.' });
+      setNotification({ type: 'success', message: t('billing_cancel_success_msg') });
     } catch (err: any) {
       setNotification({ type: 'error', message: err.message });
     } finally {
@@ -86,8 +93,8 @@ export default function BillingPage() {
   return (
     <div className="max-w-3xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white mb-1">Suscripción</h1>
-        <p className="text-slate-400 text-sm">Administra tu plan y método de pago.</p>
+        <h1 className="text-2xl font-bold text-white mb-1">{t('nav_billing')}</h1>
+        <p className="text-slate-400 text-sm">{t('billing_sub')}</p>
       </div>
 
       {notification && (
@@ -105,16 +112,16 @@ export default function BillingPage() {
         <div className="mb-8 p-5 rounded-xl border" style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <p className="text-xs text-slate-500 mb-1">Plan actual</p>
+              <p className="text-xs text-slate-500 mb-1">{t('billing_current_plan')}</p>
               <p className="text-lg font-bold text-white">{PLAN_DETAILS[currentPlan].name}</p>
               {status.currentPeriodEnd && !status.cancelAtPeriodEnd && (
                 <p className="text-xs text-slate-500 mt-1">
-                  Próxima renovación: {new Date(status.currentPeriodEnd).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {t('billing_next_renewal', new Date(status.currentPeriodEnd).toLocaleDateString(LOCALE_MAP[lang], { day: 'numeric', month: 'long', year: 'numeric' }))}
                 </p>
               )}
               {status.cancelAtPeriodEnd && (
                 <p className="text-xs text-amber-400 mt-1">
-                  Se cancelará{status.currentPeriodEnd ? ` el ${new Date(status.currentPeriodEnd).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''} — no se renovará.
+                  {t('billing_cancel_notice', status.currentPeriodEnd ? new Date(status.currentPeriodEnd).toLocaleDateString(LOCALE_MAP[lang], { day: 'numeric', month: 'long', year: 'numeric' }) : undefined)}
                 </p>
               )}
             </div>
@@ -133,7 +140,7 @@ export default function BillingPage() {
                   disabled={!!actionBusy}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-600 text-slate-300 hover:bg-white/5 transition-colors disabled:opacity-50"
                 >
-                  {actionBusy === 'portal' ? 'Redirigiendo…' : 'Gestionar suscripción'}
+                  {actionBusy === 'portal' ? t('connect_redirecting') : t('billing_manage_sub')}
                 </button>
               )}
               {isActive && !status.cancelAtPeriodEnd && (
@@ -142,7 +149,7 @@ export default function BillingPage() {
                   disabled={!!actionBusy}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                 >
-                  {actionBusy === 'cancel' ? 'Cancelando…' : 'Cancelar suscripción'}
+                  {actionBusy === 'cancel' ? t('billing_cancelling') : t('billing_cancel_sub')}
                 </button>
               )}
             </div>
@@ -171,18 +178,18 @@ export default function BillingPage() {
                 <span className="text-sm font-semibold text-white">{details.name}</span>
                 {plan === 'professional' && (
                   <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-violet-500/20 text-violet-300 border border-violet-500/20">
-                    Popular
+                    {t('billing_popular')}
                   </span>
                 )}
                 {isCurrent && (
                   <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-brand-500/20 text-brand-300 border border-brand-500/20">
-                    Tu plan
+                    {t('billing_your_plan')}
                   </span>
                 )}
               </div>
 
               <p className="text-2xl font-bold text-white mb-1">
-                ${details.price}<span className="text-sm font-normal text-slate-400">/mes</span>
+                ${details.price}<span className="text-sm font-normal text-slate-400">{t('plan_month')}</span>
               </p>
 
               <ul className="flex-1 mt-3 space-y-2">
@@ -205,10 +212,10 @@ export default function BillingPage() {
                     : 'bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50'
                 }`}
               >
-                {isCurrent ? 'Plan actual'
-                  : busy ? 'Redirigiendo…'
-                  : isActive ? 'Cambiar a este plan'
-                  : 'Suscribirse'}
+                {isCurrent ? t('billing_current_plan')
+                  : busy ? t('connect_redirecting')
+                  : isActive ? t('billing_switch_plan')
+                  : t('billing_subscribe')}
               </button>
             </div>
           );
@@ -216,7 +223,7 @@ export default function BillingPage() {
       </div>
 
       <p className="mt-6 text-xs text-slate-600 text-center">
-        Pagos procesados de forma segura por Stripe. Cancela en cualquier momento.
+        {t('billing_footer_note')}
       </p>
     </div>
   );
