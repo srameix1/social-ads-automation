@@ -3,29 +3,35 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import type { Post } from '@/lib/types';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LOCALE_MAP } from '@/lib/i18n';
 
 const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
 
-const WORKFLOW_STYLES: Record<string, { label: string; cls: string }> = {
-  draft:               { label: 'Borrador',          cls: 'bg-slate-700 text-slate-300' },
-  described:           { label: 'Descripción lista', cls: 'bg-slate-700 text-slate-300' },
-  generating_copy:     { label: 'Generando copy…',   cls: 'bg-blue-500/20 text-blue-300' },
-  copy_ready:          { label: 'Copy listo',         cls: 'bg-blue-500/20 text-blue-300' },
-  generating_visuals:  { label: 'Generando visuales…', cls: 'bg-amber-500/20 text-amber-300' },
-  visuals_ready:       { label: 'Visuales listos',   cls: 'bg-violet-500/20 text-violet-300' },
-  visuals_failed:      { label: 'Error visuales',    cls: 'bg-rose-500/20 text-rose-400' },
-  visual_selected:     { label: 'Visual elegido',    cls: 'bg-violet-500/20 text-violet-300' },
-  generating_video:    { label: 'Generando video…',  cls: 'bg-amber-500/20 text-amber-300' },
-  confirmed:           { label: 'Confirmado',         cls: 'bg-emerald-500/20 text-emerald-300' },
-};
+function useWorkflowStyles(t: (key: string, ...args: any[]) => string): Record<string, { label: string; cls: string }> {
+  return {
+    draft:               { label: t('posts_wf_draft'),              cls: 'bg-slate-700 text-slate-300' },
+    described:           { label: t('posts_wf_described'),          cls: 'bg-slate-700 text-slate-300' },
+    generating_copy:     { label: t('posts_wf_generating_copy'),    cls: 'bg-blue-500/20 text-blue-300' },
+    copy_ready:          { label: t('posts_wf_copy_ready'),          cls: 'bg-blue-500/20 text-blue-300' },
+    generating_visuals:  { label: t('posts_wf_generating_visuals'), cls: 'bg-amber-500/20 text-amber-300' },
+    visuals_ready:       { label: t('posts_wf_visuals_ready'),      cls: 'bg-violet-500/20 text-violet-300' },
+    visuals_failed:      { label: t('posts_wf_visuals_failed'),     cls: 'bg-rose-500/20 text-rose-400' },
+    visual_selected:     { label: t('posts_wf_visual_selected'),    cls: 'bg-violet-500/20 text-violet-300' },
+    generating_video:    { label: t('posts_wf_generating_video'),   cls: 'bg-amber-500/20 text-amber-300' },
+    confirmed:           { label: t('posts_wf_confirmed'),           cls: 'bg-emerald-500/20 text-emerald-300' },
+  };
+}
 
-const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
-  draft:      { label: 'Borrador',    cls: 'bg-slate-700 text-slate-300' },
-  scheduled:  { label: 'Agendado',   cls: 'bg-blue-500/20 text-blue-300' },
-  publishing: { label: 'Publicando', cls: 'bg-amber-500/20 text-amber-300' },
-  published:  { label: 'Publicado',  cls: 'bg-emerald-500/20 text-emerald-300' },
-  failed:     { label: 'Error',      cls: 'bg-rose-500/20 text-rose-400' },
-};
+function useStatusStyles(t: (key: string, ...args: any[]) => string): Record<string, { label: string; cls: string }> {
+  return {
+    draft:      { label: t('posts_wf_draft'),          cls: 'bg-slate-700 text-slate-300' },
+    scheduled:  { label: t('posts_status_scheduled'),  cls: 'bg-blue-500/20 text-blue-300' },
+    publishing: { label: t('posts_status_publishing'), cls: 'bg-amber-500/20 text-amber-300' },
+    published:  { label: t('posts_status_published'),  cls: 'bg-emerald-500/20 text-emerald-300' },
+    failed:     { label: t('posts_status_failed'),      cls: 'bg-rose-500/20 text-rose-400' },
+  };
+}
 
 const PLATFORM_ICONS: Record<string, string> = {
   instagram: '📸', tiktok: '🎵', facebook: '👥',
@@ -50,12 +56,15 @@ function isVideoFormat(format: string): boolean {
 }
 
 export function PostsList({ posts, campaignId }: Props) {
+  const { lang, t } = useLanguage();
+  const WORKFLOW_STYLES = useWorkflowStyles(t);
+  const STATUS_STYLES   = useStatusStyles(t);
   const [previewPost, setPreviewPost] = useState<Post | null>(null);
 
   if (!posts.length) {
     return (
       <p className="text-center py-8 text-slate-600 text-sm">
-        No hay anuncios todavía. Agrega el primero.
+        {t('posts_empty')}
       </p>
     );
   }
@@ -109,7 +118,7 @@ export function PostsList({ posts, campaignId }: Props) {
                 </div>
                 {post.scheduled_date && (
                   <p className="text-xs text-slate-600 mt-0.5">
-                    {new Date(post.scheduled_date).toLocaleDateString('es-MX', {
+                    {new Date(post.scheduled_date).toLocaleDateString(LOCALE_MAP[lang], {
                       day: 'numeric', month: 'short', year: 'numeric',
                     })}
                   </p>
@@ -126,7 +135,7 @@ export function PostsList({ posts, campaignId }: Props) {
                     href={`/campaigns/${campaignId}/posts/new?postId=${post.id}`}
                     className="text-xs text-brand-400 hover:text-brand-300 font-medium transition-colors"
                   >
-                    Continuar →
+                    {t('step1_btn')}
                   </Link>
                 )}
                 {isConfirmed && hasMedia && (
@@ -134,7 +143,7 @@ export function PostsList({ posts, campaignId }: Props) {
                     onClick={() => setPreviewPost(post)}
                     className="text-xs text-brand-400 hover:text-brand-300 font-medium transition-colors"
                   >
-                    Ver anuncio →
+                    {t('posts_view_ad')}
                   </button>
                 )}
               </div>
@@ -157,7 +166,7 @@ export function PostsList({ posts, campaignId }: Props) {
               onClick={() => setPreviewPost(null)}
               className="absolute -top-10 right-0 text-white/60 hover:text-white text-sm font-medium transition-colors"
             >
-              Cerrar ✕
+              {t('posts_close')}
             </button>
             <div className="rounded-2xl overflow-hidden bg-black border border-white/[0.08]">
               {isVideoFormat(previewPost.format) ? (
@@ -174,7 +183,7 @@ export function PostsList({ posts, campaignId }: Props) {
               ) : (
                 <img
                   src={`${BACKEND_BASE}${previewPost.selected_visual_url}`}
-                  alt="Vista previa del anuncio"
+                  alt={t('posts_preview_alt')}
                   className="w-full h-auto max-h-[85vh] object-contain"
                 />
               )}
