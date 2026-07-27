@@ -16,13 +16,13 @@ const PLATFORM_ICONS: Record<string, string> = {
 export default function CampaignDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { campaign, loading } = useCampaign(id);
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
 
   if (loading) return <PageLoader />;
   if (!campaign) return (
     <div className="text-center py-20 text-slate-500">
-      <p>Campaña no encontrada</p>
-      <Link href="/campaigns" className="text-brand-400 text-sm mt-2 block">← Volver</Link>
+      <p>{t('camp_not_found')}</p>
+      <Link href="/campaigns" className="text-brand-400 text-sm mt-2 block">{t('camp_not_found_back')}</Link>
     </div>
   );
 
@@ -40,7 +40,7 @@ export default function CampaignDetailPage() {
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
           </svg>
-          Mis campañas
+          {t('camp_back')}
         </Link>
         <h1 className="text-2xl font-bold text-white">{campaign.title}</h1>
         <div className="flex items-center gap-3 mt-2 flex-wrap">
@@ -64,7 +64,7 @@ export default function CampaignDetailPage() {
       <div className="surface rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-slate-200">Anuncios del mes</h2>
+            <h2 className="text-sm font-semibold text-slate-200">{t('camp_posts_month_title')}</h2>
             <div className="flex items-center gap-2 mt-1.5">
               <div className="w-28 h-1 rounded-full bg-white/[0.06] overflow-hidden">
                 <div
@@ -73,7 +73,7 @@ export default function CampaignDetailPage() {
                 />
               </div>
               <span className={`text-xs ${atLimit ? 'text-rose-400' : 'text-slate-500'}`}>
-                {postsUsed}/{maxPosts} anuncios
+                {t('dash_ads_count', postsUsed, maxPosts)}
               </span>
             </div>
           </div>
@@ -81,12 +81,12 @@ export default function CampaignDetailPage() {
             <Button
               size="sm"
               disabled={atLimit}
-              title={atLimit ? `Límite alcanzado (${maxPosts}/${maxPosts})` : undefined}
+              title={atLimit ? t('camp_posts_limit_reached', maxPosts) : undefined}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/>
               </svg>
-              Agregar anuncio
+              {t('camp_add_post')}
             </Button>
           </Link>
         </div>

@@ -90,6 +90,12 @@ const es: Dict = {
   fb_pages_empty:         'No se encontraron páginas pendientes. Vuelve a intentar la conexión.',
   fb_pages_id:            (id: string) => `ID: ${id}`,
 
+  // Campaign detail page leftovers
+  camp_not_found_back:     '← Volver',
+  camp_posts_month_title:  'Anuncios del mes',
+  camp_posts_limit_reached: (max: number) => `Límite alcanzado (${max}/${max})`,
+  camp_add_post:           'Agregar anuncio',
+
   // Login
   login_welcome:    'Bienvenido',
   login_subtitle:   'Ingresa a tu panel de control',
@@ -538,6 +544,12 @@ const en: Dict = {
   fb_pages_empty:         'No pending pages found. Try connecting again.',
   fb_pages_id:            (id: string) => `ID: ${id}`,
 
+  // Campaign detail page leftovers
+  camp_not_found_back:     '← Back',
+  camp_posts_month_title:  "This month's ads",
+  camp_posts_limit_reached: (max: number) => `Limit reached (${max}/${max})`,
+  camp_add_post:           'Add ad',
+
   // Login
   login_welcome:    'Welcome back',
   login_subtitle:   'Sign in to your dashboard',
@@ -985,6 +997,12 @@ const pt: Dict = {
   fb_pages_sub:           'Encontramos várias Páginas na sua conta. Escolha qual você quer usar para publicar.',
   fb_pages_empty:         'Nenhuma página pendente encontrada. Tente conectar novamente.',
   fb_pages_id:            (id: string) => `ID: ${id}`,
+
+  // Campaign detail page leftovers
+  camp_not_found_back:     '← Voltar',
+  camp_posts_month_title:  'Anúncios do mês',
+  camp_posts_limit_reached: (max: number) => `Limite atingido (${max}/${max})`,
+  camp_add_post:           'Adicionar anúncio',
 
   // Login
   login_welcome:    'Bem-vindo',
