@@ -116,6 +116,13 @@ const es: Dict = {
   posts_close:                  'Cerrar ✕',
   posts_preview_alt:            'Vista previa del anuncio',
 
+  // TrialLimitModal
+  trial_whatsapp_message: (email: string) => `Hola, mi período de prueba en SpotFlow se agotó y quiero conocer los planes disponibles. Mi correo es: ${email}`,
+  trial_limit_title:      'Tu período de prueba terminó',
+  trial_limit_sub:        'Ya usaste todas tus publicaciones de prueba. Escríbenos por WhatsApp o elige un plan para seguir creando anuncios.',
+  trial_whatsapp_cta:     'Escribir por WhatsApp',
+  trial_view_plans:       'Ver planes',
+
   // Login
   login_welcome:    'Bienvenido',
   login_subtitle:   'Ingresa a tu panel de control',
@@ -590,6 +597,13 @@ const en: Dict = {
   posts_close:                  'Close ✕',
   posts_preview_alt:            'Ad preview',
 
+  // TrialLimitModal
+  trial_whatsapp_message: (email: string) => `Hi, my free trial on SpotFlow has ended and I'd like to learn about the available plans. My email is: ${email}`,
+  trial_limit_title:      'Your trial period has ended',
+  trial_limit_sub:        "You've used all your trial posts. Message us on WhatsApp or choose a plan to keep creating ads.",
+  trial_whatsapp_cta:     'Message us on WhatsApp',
+  trial_view_plans:       'View plans',
+
   // Login
   login_welcome:    'Welcome back',
   login_subtitle:   'Sign in to your dashboard',
@@ -1063,6 +1077,13 @@ const pt: Dict = {
   posts_view_ad:                'Ver anúncio →',
   posts_close:                  'Fechar ✕',
   posts_preview_alt:            'Pré-visualização do anúncio',
+
+  // TrialLimitModal
+  trial_whatsapp_message: (email: string) => `Olá, meu período de teste no SpotFlow terminou e eu gostaria de conhecer os planos disponíveis. Meu e-mail é: ${email}`,
+  trial_limit_title:      'Seu período de teste terminou',
+  trial_limit_sub:        'Você já usou todas as suas publicações de teste. Fale conosco pelo WhatsApp ou escolha um plano para continuar criando anúncios.',
+  trial_whatsapp_cta:     'Falar pelo WhatsApp',
+  trial_view_plans:       'Ver planos',
 
   // Login
   login_welcome:    'Bem-vindo',
