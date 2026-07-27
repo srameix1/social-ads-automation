@@ -4,11 +4,13 @@ import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { billing, clients } from '@/lib/api';
 import { PLAN_DETAILS, type ServicePlan } from '@/lib/types';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const PLAN_ORDER: ServicePlan[] = ['basic', 'professional', 'premium'];
 
 export default function SelectPlanPage() {
   const searchParams = useSearchParams();
+  const { t } = useLanguage();
   const trialEnded = searchParams.get('trial_ended') === '1';
   const [pending, setPending] = useState<ServicePlan | null>(null);
   const [error,   setError]   = useState<string | null>(null);
@@ -34,12 +36,12 @@ export default function SelectPlanPage() {
       {/* Header */}
       <div className="text-center mb-10">
         <h1 className="text-3xl font-bold text-slate-100 mb-2">
-          {trialEnded ? 'Tu prueba gratuita terminó — elige tu plan para continuar' : 'Elige tu plan'}
+          {trialEnded ? t('select_plan_title_trial_ended') : t('select_plan_title')}
         </h1>
         <p className="text-slate-400 text-sm">
           {trialEnded
-            ? 'Ya usaste todas tus publicaciones de prueba. Elige un plan para seguir creando anuncios sin límite.'
-            : 'Selecciona el plan que mejor se adapte a tu negocio para comenzar.'}
+            ? t('select_plan_sub_trial_ended')
+            : t('select_plan_sub')}
         </p>
       </div>
 
@@ -68,7 +70,7 @@ export default function SelectPlanPage() {
               {/* Popular badge */}
               {isPro && (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-xs font-semibold bg-brand-600 text-white whitespace-nowrap">
-                  Más popular
+                  {t('plan_popular')}
                 </span>
               )}
 
@@ -79,7 +81,7 @@ export default function SelectPlanPage() {
                 </p>
                 <p className="text-4xl font-bold text-slate-100">
                   ${plan.price}
-                  <span className="text-sm font-normal text-slate-500 ml-1">/mes</span>
+                  <span className="text-sm font-normal text-slate-500 ml-1">{t('plan_month')}</span>
                 </p>
               </div>
 
@@ -115,7 +117,7 @@ export default function SelectPlanPage() {
                   pending && !isActive ? 'opacity-40 cursor-not-allowed' : '',
                 ].join(' ')}
               >
-                {isActive ? 'Guardando...' : 'Seleccionar plan'}
+                {isActive ? t('strat_selecting') : t('select_plan_cta')}
               </button>
             </div>
           );

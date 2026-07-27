@@ -76,6 +76,13 @@ const es: Dict = {
   billing_success_active_hint:      'Serás redirigido automáticamente al dashboard en unos segundos.',
   billing_success_connect_link:     'Conectar redes sociales',
 
+  // Select plan page
+  select_plan_title:            'Elige tu plan',
+  select_plan_title_trial_ended: 'Tu prueba gratuita terminó — elige tu plan para continuar',
+  select_plan_sub:              'Selecciona el plan que mejor se adapte a tu negocio para comenzar.',
+  select_plan_sub_trial_ended:  'Ya usaste todas tus publicaciones de prueba. Elige un plan para seguir creando anuncios sin límite.',
+  select_plan_cta:              'Seleccionar plan',
+
   // Login
   login_welcome:    'Bienvenido',
   login_subtitle:   'Ingresa a tu panel de control',
@@ -510,6 +517,13 @@ const en: Dict = {
   billing_success_active_hint:      "You'll be redirected to the dashboard automatically in a few seconds.",
   billing_success_connect_link:     'Connect social media',
 
+  // Select plan page
+  select_plan_title:            'Choose your plan',
+  select_plan_title_trial_ended: 'Your free trial has ended — choose your plan to continue',
+  select_plan_sub:              'Select the plan that best fits your business to get started.',
+  select_plan_sub_trial_ended:  "You've used all your trial posts. Choose a plan to keep creating ads without limits.",
+  select_plan_cta:              'Select plan',
+
   // Login
   login_welcome:    'Welcome back',
   login_subtitle:   'Sign in to your dashboard',
@@ -943,6 +957,13 @@ const pt: Dict = {
   billing_success_active_sub:       'Seu plano já está ativo. Agora você pode criar campanhas.',
   billing_success_active_hint:      'Você será redirecionado automaticamente para o dashboard em alguns segundos.',
   billing_success_connect_link:     'Conectar redes sociais',
+
+  // Select plan page
+  select_plan_title:            'Escolha seu plano',
+  select_plan_title_trial_ended: 'Sua avaliação gratuita terminou — escolha seu plano para continuar',
+  select_plan_sub:              'Selecione o plano que melhor se adapta ao seu negócio para começar.',
+  select_plan_sub_trial_ended:  'Você já usou todas as suas publicações de teste. Escolha um plano para continuar criando anúncios sem limite.',
+  select_plan_cta:              'Selecionar plano',
 
   // Login
   login_welcome:    'Bem-vindo',
