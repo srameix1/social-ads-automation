@@ -127,6 +127,11 @@ const es: Dict = {
   pub_view_post: 'Ver post →',
   pub_pending:   'Pendiente',
 
+  // Input / Spinner
+  input_hide_password: 'Ocultar contraseña',
+  input_show_password: 'Mostrar contraseña',
+  page_loading:        'Cargando...',
+
   // Login
   login_welcome:    'Bienvenido',
   login_subtitle:   'Ingresa a tu panel de control',
@@ -612,6 +617,11 @@ const en: Dict = {
   pub_view_post: 'View post →',
   pub_pending:   'Pending',
 
+  // Input / Spinner
+  input_hide_password: 'Hide password',
+  input_show_password: 'Show password',
+  page_loading:        'Loading...',
+
   // Login
   login_welcome:    'Welcome back',
   login_subtitle:   'Sign in to your dashboard',
@@ -1096,6 +1106,11 @@ const pt: Dict = {
   // PublicationResult
   pub_view_post: 'Ver post →',
   pub_pending:   'Pendente',
+
+  // Input / Spinner
+  input_hide_password: 'Ocultar senha',
+  input_show_password: 'Mostrar senha',
+  page_loading:        'Carregando...',
 
   // Login
   login_welcome:    'Bem-vindo',

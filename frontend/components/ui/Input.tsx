@@ -1,6 +1,7 @@
 'use client';
 
 import { InputHTMLAttributes, TextareaHTMLAttributes, forwardRef, useState } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?:   string;
@@ -38,6 +39,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   { label, error, hint, className = '', type, ...props },
   ref,
 ) {
+  const { t } = useLanguage();
   const [showPwd, setShowPwd] = useState(false);
   const isPassword = type === 'password';
   const resolvedType = isPassword && showPwd ? 'text' : type;
@@ -67,7 +69,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
             tabIndex={-1}
             onClick={() => setShowPwd(v => !v)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors focus:outline-none"
-            aria-label={showPwd ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            aria-label={showPwd ? t('input_hide_password') : t('input_show_password')}
           >
             {showPwd ? <EyeOff /> : <EyeOpen />}
           </button>

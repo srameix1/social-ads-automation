@@ -1,3 +1,7 @@
+'use client';
+
+import { useLanguage } from '@/contexts/LanguageContext';
+
 interface Props {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -20,10 +24,11 @@ export function Spinner({ size = 'md', className = '' }: Props) {
 }
 
 export function PageLoader() {
+  const { t } = useLanguage();
   return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-3">
       <Spinner size="lg" className="text-brand-500" />
-      <p className="text-sm text-slate-500">Cargando...</p>
+      <p className="text-sm text-slate-500">{t('page_loading')}</p>
     </div>
   );
 }
