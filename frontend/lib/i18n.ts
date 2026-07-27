@@ -63,6 +63,19 @@ const es: Dict = {
   billing_subscribe:             'Suscribirse',
   billing_footer_note:           'Pagos procesados de forma segura por Stripe. Cancela en cualquier momento.',
 
+  // Billing success page
+  billing_success_processing_title: 'Procesando tu pago...',
+  billing_success_processing_sub:   'Estamos confirmando tu pago con Stripe.',
+  billing_success_processing_hint:  'Esto normalmente toma unos segundos.',
+  billing_success_timeout_title:    'Esto está tardando más de lo esperado',
+  billing_success_timeout_sub:      'Tu pago puede estar confirmado igual — a veces Stripe tarda unos minutos en avisarnos.',
+  billing_success_timeout_hint:     'Si ya pagaste, revisa el estado en Suscripción en unos minutos.',
+  billing_success_timeout_link:     'Ir a Suscripción',
+  billing_success_active_title:     'Suscripción activada',
+  billing_success_active_sub:       'Tu plan ya está activo. Ahora puedes crear campañas.',
+  billing_success_active_hint:      'Serás redirigido automáticamente al dashboard en unos segundos.',
+  billing_success_connect_link:     'Conectar redes sociales',
+
   // Login
   login_welcome:    'Bienvenido',
   login_subtitle:   'Ingresa a tu panel de control',
@@ -484,6 +497,19 @@ const en: Dict = {
   billing_subscribe:             'Subscribe',
   billing_footer_note:           'Payments securely processed by Stripe. Cancel anytime.',
 
+  // Billing success page
+  billing_success_processing_title: 'Processing your payment...',
+  billing_success_processing_sub:   "We're confirming your payment with Stripe.",
+  billing_success_processing_hint:  'This usually takes a few seconds.',
+  billing_success_timeout_title:    'This is taking longer than expected',
+  billing_success_timeout_sub:      'Your payment may still be confirmed — Stripe sometimes takes a few minutes to notify us.',
+  billing_success_timeout_hint:     'If you already paid, check the status in Subscription in a few minutes.',
+  billing_success_timeout_link:     'Go to Subscription',
+  billing_success_active_title:     'Subscription activated',
+  billing_success_active_sub:       'Your plan is now active. You can start creating campaigns.',
+  billing_success_active_hint:      "You'll be redirected to the dashboard automatically in a few seconds.",
+  billing_success_connect_link:     'Connect social media',
+
   // Login
   login_welcome:    'Welcome back',
   login_subtitle:   'Sign in to your dashboard',
@@ -904,6 +930,19 @@ const pt: Dict = {
   billing_switch_plan:           'Mudar para este plano',
   billing_subscribe:             'Assinar',
   billing_footer_note:           'Pagamentos processados com segurança pela Stripe. Cancele quando quiser.',
+
+  // Billing success page
+  billing_success_processing_title: 'Processando seu pagamento...',
+  billing_success_processing_sub:   'Estamos confirmando seu pagamento com a Stripe.',
+  billing_success_processing_hint:  'Isso normalmente leva alguns segundos.',
+  billing_success_timeout_title:    'Isso está demorando mais do que o esperado',
+  billing_success_timeout_sub:      'Seu pagamento ainda pode estar confirmado — às vezes a Stripe demora alguns minutos para nos avisar.',
+  billing_success_timeout_hint:     'Se você já pagou, verifique o status em Assinatura em alguns minutos.',
+  billing_success_timeout_link:     'Ir para Assinatura',
+  billing_success_active_title:     'Assinatura ativada',
+  billing_success_active_sub:       'Seu plano já está ativo. Agora você pode criar campanhas.',
+  billing_success_active_hint:      'Você será redirecionado automaticamente para o dashboard em alguns segundos.',
+  billing_success_connect_link:     'Conectar redes sociais',
 
   // Login
   login_welcome:    'Bem-vindo',
