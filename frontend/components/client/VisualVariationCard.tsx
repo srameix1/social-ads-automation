@@ -26,7 +26,7 @@ export function VisualVariationCard({ variation, onSelect, selecting }: Props) {
         {isReady ? (
           <img
             src={imageUrl!}
-            alt={`Opción visual ${variation.position}`}
+            alt={t('visual_option_alt', variation.position)}
             className="w-full h-full object-cover"
           />
         ) : (
