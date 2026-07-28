@@ -78,7 +78,7 @@ export default function DeliveryModePage() {
             onClick={handleSave}
             className="inline-flex items-center justify-center rounded-full bg-brand-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-600"
           >
-            {saving ? 'Guardando…' : t('delivery_mode_save')}
+            {saving ? t('delivery_mode_saving') : t('delivery_mode_save')}
           </button>
           <p className="text-xs text-slate-500 sm:text-right">{t('delivery_mode_note')}</p>
         </div>

@@ -163,8 +163,9 @@ function VerifyEmailContent() {
 }
 
 export default function VerifyEmailPage() {
+  const { t } = useLanguage();
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div>{t('page_loading')}</div>}>
       <VerifyEmailContent />
     </Suspense>
   );
