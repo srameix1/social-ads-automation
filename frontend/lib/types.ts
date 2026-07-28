@@ -10,35 +10,35 @@ export type ServicePlan = 'basic' | 'professional' | 'premium';
 export type DeliveryMode = 'automatic' | 'manual';
 
 export const PLAN_DETAILS: Record<ServicePlan, {
-  name: string; price: number; posts: number; features: string[]; platforms: string[];
+  nameKey: string; benefitKey: string; price: number; posts: number; featureKeys: string[]; platforms: string[];
 }> = {
   basic: {
-    name: 'Básico', price: 97, posts: 20,
+    nameKey: 'plan_name_basic', benefitKey: 'plan_benefit_basic', price: 97, posts: 20,
     platforms: ['instagram', 'facebook'],
-    features: [
-      '20 posts al mes',
-      'Imágenes generadas por IA con texto superpuesto',
-      'Publicación en Instagram y Facebook',
+    featureKeys: [
+      'plan_feature_basic_1',
+      'plan_feature_basic_2',
+      'plan_feature_basic_3',
     ],
   },
   professional: {
-    name: 'Profesional', price: 197, posts: 24,
+    nameKey: 'plan_name_professional', benefitKey: 'plan_benefit_professional', price: 197, posts: 24,
     platforms: ['instagram', 'facebook', 'tiktok'],
-    features: [
-      '24 posts al mes',
-      'Logo de tu negocio en cada imagen',
-      'Colores y tipografía de tu marca',
-      'Publicación en Instagram, Facebook y TikTok',
+    featureKeys: [
+      'plan_feature_pro_1',
+      'plan_feature_pro_2',
+      'plan_feature_pro_3',
+      'plan_feature_pro_4',
     ],
   },
   premium: {
-    name: 'Premium', price: 397, posts: 30,
+    nameKey: 'plan_name_premium', benefitKey: 'plan_benefit_premium', price: 397, posts: 30,
     platforms: ['instagram', 'facebook', 'tiktok'],
-    features: [
-      '30 posts al mes',
-      '8 videos cortos Veo 2 incluidos',
-      'Videos de 6-8 segundos generados con IA',
-      'Publicación en Instagram, Facebook y TikTok',
+    featureKeys: [
+      'plan_feature_premium_1',
+      'plan_feature_premium_2',
+      'plan_feature_premium_3',
+      'plan_feature_pro_4',
     ],
   },
 };

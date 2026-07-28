@@ -403,6 +403,8 @@ const es: Dict = {
   prof_logo_upload_btn:    'Subir logo',
   prof_logo_size_hint:     'JPG, PNG, WebP, SVG · Máx 2 MB',
   prof_logo_tip:           '💡 Para mejor resultado usa un logo con fondo transparente (PNG o SVG)',
+  prof_logo_too_large:     'El logo no puede superar 2 MB',
+  prof_logo_alt:           'Logo',
 
   // Setup page
   setup_title: 'Configura tu perfil',
@@ -450,6 +452,24 @@ const es: Dict = {
   plan_popular: 'Más popular',
   plan_all_in:  'Todo incluido',
   plan_month:   '/mes',
+
+  // Plan details (nombres, beneficio corto y features de PLAN_DETAILS)
+  plan_name_basic:        'Básico',
+  plan_name_professional: 'Profesional',
+  plan_name_premium:      'Premium',
+  plan_benefit_basic:        '20 imágenes/mes',
+  plan_benefit_professional: '24 anuncios/mes — imagen o video animado',
+  plan_benefit_premium:      '30 anuncios/mes — 8 videos Veo 2 incluidos + imagen o video animado',
+  plan_feature_basic_1:     '20 posts al mes',
+  plan_feature_basic_2:     'Imágenes generadas por IA con texto superpuesto',
+  plan_feature_basic_3:     'Publicación en Instagram y Facebook',
+  plan_feature_pro_1:       '24 posts al mes',
+  plan_feature_pro_2:       'Logo de tu negocio en cada imagen',
+  plan_feature_pro_3:       'Colores y tipografía de tu marca',
+  plan_feature_pro_4:       'Publicación en Instagram, Facebook y TikTok',
+  plan_feature_premium_1:   '30 posts al mes',
+  plan_feature_premium_2:   '8 videos cortos Veo 2 incluidos',
+  plan_feature_premium_3:   'Videos de 6-8 segundos generados con IA',
 
   // Done step
   done_title: '¡Perfil listo!',
@@ -899,6 +919,8 @@ const en: Dict = {
   prof_logo_upload_btn:    'Upload logo',
   prof_logo_size_hint:     'JPG, PNG, WebP, SVG · Max 2 MB',
   prof_logo_tip:           '💡 For best results, use a logo with transparent background (PNG or SVG)',
+  prof_logo_too_large:     'The logo cannot exceed 2 MB',
+  prof_logo_alt:           'Logo',
 
   // Setup page
   setup_title: 'Set up your profile',
@@ -946,6 +968,24 @@ const en: Dict = {
   plan_popular: 'Most popular',
   plan_all_in:  'All included',
   plan_month:   '/mo',
+
+  // Plan details (names, short benefit and features of PLAN_DETAILS)
+  plan_name_basic:        'Basic',
+  plan_name_professional: 'Professional',
+  plan_name_premium:      'Premium',
+  plan_benefit_basic:        '20 images/month',
+  plan_benefit_professional: '24 ads/month — image or animated video',
+  plan_benefit_premium:      '30 ads/month — 8 Veo 2 videos included + image or animated video',
+  plan_feature_basic_1:     '20 posts per month',
+  plan_feature_basic_2:     'AI-generated images with overlaid text',
+  plan_feature_basic_3:     'Publishing on Instagram and Facebook',
+  plan_feature_pro_1:       '24 posts per month',
+  plan_feature_pro_2:       'Your business logo on every image',
+  plan_feature_pro_3:       'Your brand colors and typography',
+  plan_feature_pro_4:       'Publishing on Instagram, Facebook and TikTok',
+  plan_feature_premium_1:   '30 posts per month',
+  plan_feature_premium_2:   '8 short Veo 2 videos included',
+  plan_feature_premium_3:   '6-8 second AI-generated videos',
 
   // Done step
   done_title: 'Profile ready!',
@@ -1395,6 +1435,8 @@ const pt: Dict = {
   prof_logo_upload_btn:    'Enviar logo',
   prof_logo_size_hint:     'JPG, PNG, WebP, SVG · Máx 2 MB',
   prof_logo_tip:           '💡 Para melhores resultados, use um logo com fundo transparente (PNG ou SVG)',
+  prof_logo_too_large:     'O logo não pode ultrapassar 2 MB',
+  prof_logo_alt:           'Logo',
 
   // Setup page
   setup_title: 'Configure seu perfil',
@@ -1442,6 +1484,24 @@ const pt: Dict = {
   plan_popular: 'Mais popular',
   plan_all_in:  'Tudo incluído',
   plan_month:   '/mês',
+
+  // Plan details (nomes, benefício curto e features de PLAN_DETAILS)
+  plan_name_basic:        'Básico',
+  plan_name_professional: 'Profissional',
+  plan_name_premium:      'Premium',
+  plan_benefit_basic:        '20 imagens/mês',
+  plan_benefit_professional: '24 anúncios/mês — imagem ou vídeo animado',
+  plan_benefit_premium:      '30 anúncios/mês — 8 vídeos Veo 2 incluídos + imagem ou vídeo animado',
+  plan_feature_basic_1:     '20 posts por mês',
+  plan_feature_basic_2:     'Imagens geradas por IA com texto sobreposto',
+  plan_feature_basic_3:     'Publicação no Instagram e Facebook',
+  plan_feature_pro_1:       '24 posts por mês',
+  plan_feature_pro_2:       'Logo do seu negócio em cada imagem',
+  plan_feature_pro_3:       'Cores e tipografia da sua marca',
+  plan_feature_pro_4:       'Publicação no Instagram, Facebook e TikTok',
+  plan_feature_premium_1:   '30 posts por mês',
+  plan_feature_premium_2:   '8 vídeos curtos Veo 2 incluídos',
+  plan_feature_premium_3:   'Vídeos de 6-8 segundos gerados com IA',
 
   // Done step
   done_title: 'Perfil pronto!',

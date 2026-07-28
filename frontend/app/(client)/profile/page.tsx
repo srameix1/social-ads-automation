@@ -10,6 +10,7 @@ import { Modal } from '@/components/ui/Modal';
 import { PageLoader } from '@/components/ui/Spinner';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LOCALE_MAP } from '@/lib/i18n';
+import { PLAN_DETAILS } from '@/lib/types';
 import type { ClientProfile, CredentialStatus } from '@/lib/types';
 
 const PLATFORMS = [
@@ -30,12 +31,10 @@ const PLATFORMS = [
     ]},
 ];
 
-const PLAN_LABELS: Record<string, {
-  label_es: string; label_en: string; label_pt: string; price: string; color: string; benefit: string;
-}> = {
-  basic:        { label_es: 'Básico',       label_en: 'Basic',        label_pt: 'Básico',        price: '$97/mes',  color: 'text-slate-300',  benefit: '20 imágenes/mes' },
-  professional: { label_es: 'Profesional',  label_en: 'Professional', label_pt: 'Profissional',  price: '$197/mes', color: 'text-brand-400',  benefit: '24 anuncios/mes — imagen o video animado' },
-  premium:      { label_es: 'Premium',      label_en: 'Premium',      label_pt: 'Premium',       price: '$397/mes', color: 'text-violet-400', benefit: '30 anuncios/mes — 8 videos Veo 2 incluidos + imagen o video animado' },
+const PLAN_COLORS: Record<string, string> = {
+  basic:        'text-slate-300',
+  professional: 'text-brand-400',
+  premium:      'text-violet-400',
 };
 
 export default function ProfilePage() {
@@ -90,7 +89,7 @@ export default function ProfilePage() {
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { setEditMsg('El logo no puede superar 2 MB'); return; }
+    if (file.size > 2 * 1024 * 1024) { setEditMsg(t('prof_logo_too_large')); return; }
     if (logoPreview) URL.revokeObjectURL(logoPreview);
     setLogoFile(file);
     setLogoPreview(URL.createObjectURL(file));
@@ -151,10 +150,9 @@ export default function ProfilePage() {
   );
 
   const planKey = profile?.plan ?? 'basic';
-  const planInfo = PLAN_LABELS[planKey];
-  const planLabel = planInfo
-    ? (lang === 'es' ? planInfo.label_es : lang === 'pt' ? planInfo.label_pt : planInfo.label_en)
-    : planKey;
+  const planDetails = PLAN_DETAILS[planKey];
+  const planLabel = planDetails ? t(planDetails.nameKey) : planKey;
+  const planColor = PLAN_COLORS[planKey] ?? 'text-slate-300';
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -171,13 +169,13 @@ export default function ProfilePage() {
             <p className="text-xs text-slate-500 mt-1">{t('prof_business_sub')}</p>
           </div>
           <div className="flex items-center gap-3">
-            {planInfo && (
+            {planDetails && (
               <div className="flex flex-col items-end gap-0.5">
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs font-semibold ${planInfo.color}`}>{planLabel}</span>
-                  <span className="text-xs text-slate-600">{planInfo.price}</span>
+                  <span className={`text-xs font-semibold ${planColor}`}>{planLabel}</span>
+                  <span className="text-xs text-slate-600">${planDetails.price}{t('plan_month')}</span>
                 </div>
-                <span className="text-[11px] text-slate-500">{planInfo.benefit}</span>
+                <span className="text-[11px] text-slate-500">{t(planDetails.benefitKey)}</span>
               </div>
             )}
             {!editing && (
@@ -224,7 +222,7 @@ export default function ProfilePage() {
                   <div className="w-20 h-20 rounded-xl border border-white/[0.08] bg-white/[0.04] flex items-center justify-center overflow-hidden flex-shrink-0">
                     <img
                       src={logoPreview ?? profile!.brand_logo_url!}
-                      alt="Logo"
+                      alt={t('prof_logo_alt')}
                       className="max-w-full max-h-full object-contain"
                     />
                   </div>
