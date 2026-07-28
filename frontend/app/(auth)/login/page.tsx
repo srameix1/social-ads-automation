@@ -119,7 +119,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="tu@email.com"
+              placeholder={t('auth_email_placeholder') as string}
               required
               autoFocus
             />
