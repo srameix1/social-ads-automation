@@ -927,11 +927,52 @@ async function callHappyHorse(
     throw new Error(`Fallo al descargar el video final (HTTP ${dlRes.status}) desde ${videoUrl}`);
   }
 
+  const rawOut = path.join(outputDir, '_tmp_happyhorse_raw.mp4');
+  const buffer = Buffer.from(await dlRes.arrayBuffer());
+  fs.writeFileSync(rawOut, buffer);
+
+  // ── Background music — Happy Horse's own output has no music track,
+  // only whatever ambient audio the model itself renders. Mux the same
+  // prepared track other formats use, over the finished video.
   const videoOut = path.join(outputDir, 'premium_video.mp4');
-  const buffer   = Buffer.from(await dlRes.arrayBuffer());
-  fs.writeFileSync(videoOut, buffer);
+  const audio    = path.join(outputDir, '_tmp_happyhorse_audio.mp3');
+  let audioReady = false;
+  try {
+    await prepareAudio(audio, HAPPYHORSE_DURATION);
+    audioReady = true;
+  } catch (err) {
+    logger.warn('[HappyHorse] Audio prep failed, video stays as downloaded (no music):', (err as Error).message);
+  }
+
+  if (audioReady) {
+    await muxAudioOverVideo(rawOut, audio, videoOut);
+    try { fs.unlinkSync(rawOut); } catch { /* ignore */ }
+  } else {
+    fs.renameSync(rawOut, videoOut);
+  }
 
   return videoOut;
+}
+
+// Mux a music track over an already-complete external video (Happy Horse's
+// download here; any single finished .mp4 in general) — same ffmpeg shape
+// (videoCodec copy, aac 128k, -shortest) already inlined 5x elsewhere in
+// this file (generateHailuoClip ×2, buildStoryWithClosingCard, concatWithAudio,
+// concatWithXfade's mux step) but never factored out on its own until now.
+function muxAudioOverVideo(videoPath: string, audioPath: string, outputPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ffmpeg()
+      .input(videoPath)
+      .input(audioPath)
+      .videoCodec('copy')
+      .audioCodec('aac')
+      .audioBitrate(128)
+      .outputOptions(['-shortest'])
+      .output(outputPath)
+      .on('end', () => resolve())
+      .on('error', (e: Error) => reject(new Error(`muxAudioOverVideo: ${e.message}`)))
+      .run();
+  });
 }
 
 // ── Core: Composed branded image ───────────────────────────────────────────
