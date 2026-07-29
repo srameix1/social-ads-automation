@@ -53,6 +53,7 @@ interface Strategy {
   visual_concept: string;
   tone:           string | null;
   target_hook:    string | null;
+  video_hook:     string | null;
   position:       number;
   selected:       boolean;
 }

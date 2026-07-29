@@ -91,6 +91,7 @@ export interface ContentInput {
   postFocus?:      string;    // what to highlight in this specific ad (post.post_focus)
   visualConcept?:  string;
   copyText:        string;
+  videoHook?:      string;    // short 8-10 word hook (strategy.video_hook) — preferred over copyText for AI-baked-text images
   primaryColor:    string;    // hex e.g. "#C9A96E"
   secondaryColor?: string;    // hex e.g. "#1A1A1A"
   logoBuffer?:     Buffer;    // PNG/SVG buffer for logo
@@ -862,13 +863,8 @@ function buildAdPromptWithText(
   const composition = COMPOSITION_DIRECTIVES[variationIndex] ?? COMPOSITION_DIRECTIVES[0];
   const seed        = Date.now();
 
-  const copyLines = input.copyText.split(/[.\n]/).map(s => s.trim()).filter(Boolean);
-  const headline  = copyLines[0] ?? input.copyText;
-  const subtitle  = copyLines.slice(1).join('. ');
-
-  const textBlock = subtitle
-    ? `PRIMARY TEXT (headline, large): "${headline}"\nSECONDARY TEXT (smaller): "${subtitle}"`
-    : `ADVERTISING TEXT: "${headline}"`;
+  const hook      = input.videoHook || input.copyText;
+  const textBlock = `ADVERTISING TEXT (short headline, 8-10 words max): "${hook}"`;
 
   const brandBlock = `BRAND NAME (small, secondary element): ${input.businessName}
 BRAND ACCENT COLOR: ${input.primaryColor}`;
@@ -878,7 +874,8 @@ TEXT REQUIREMENTS (critical):
 - Every word must appear EXACTLY as written above — no paraphrasing, no translation
 - Use typographic treatments that make text feel designed-in: frosted panels, gradient scrims, cut-out letters, embossed effects, or floating text with soft shadow
 - Text must be clearly legible, high contrast with background
-- Avoid raw white text pasted on top — text must feel integrated into the composition`;
+- Avoid raw white text pasted on top — text must feel integrated into the composition
+- The text must occupy no more than ~15% of the visual frame — the photograph/scene is the hero of the image, the text is a small design accent, not a headline banner or poster.`;
 
   if (hasPhoto) {
     return `Create a premium social media advertising image (1:1 square format, 1080×1080px).

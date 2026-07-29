@@ -24,6 +24,7 @@ interface Strategy {
   id:             string;
   copy_text:      string;
   visual_concept: string;
+  video_hook:     string | null;
 }
 
 interface ClientProfile {
@@ -52,6 +53,7 @@ export async function generateVisualsForPost(
       description:    [post.problem, post.differentiator].filter(Boolean).join(' ') || undefined,
       visualConcept:  strategy.visual_concept,
       copyText:       strategy.copy_text,
+      videoHook:      strategy.video_hook ?? undefined,
       primaryColor:   clientProfile.brand_primary_color   ?? '#1A1A1A',
       secondaryColor: clientProfile.brand_secondary_color ?? undefined,
       logoBuffer,
