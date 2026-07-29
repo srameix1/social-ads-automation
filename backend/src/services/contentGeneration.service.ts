@@ -623,24 +623,49 @@ async function _runPremiumReelFromImage(
   return { reel: reelOut };
 }
 
-// ── Plan Premium: real video from start to finish (no Ken Burns / closing card) ─
+// ── Plan Premium: 4 staged images (Gemini) + Happy Horse (Replicate,
+// reference-to-video) ─────────────────────────────────────────────────────
 //
-// 3 clips (~7s each), all AI-generated, anchored to the SAME base image/scene
-// for continuity, each with a different camera movement (push-in / static
-// detail / pull-back), joined with a soft crossfade. Same per-clip fallback
-// chain as the mixed reel: Grok (KIE.ai) → Kling 3.0 → Veo 2 → Ken Burns as
-// last resort. No closing card — logo/copy are applied afterward via
-// applyVideoOverlays.
+// Generates 4 progressively-staged clean images (before → early progress →
+// advanced progress → final result) with Gemini, then sends all 4 to Happy
+// Horse 1.1 (Replicate, reference-to-video) in a single call that returns
+// the complete ~15s vertical video directly — no local clip concatenation.
+// Falls back to one Ken Burns clip over the last successfully-generated
+// staged image (or the original selected image, if none made it) if Gemini
+// or Happy Horse fail at any point. No closing card — logo/copy are applied
+// afterward via applyVideoOverlays.
+//
+// generatePremiumVideoClip() / generateGrokClipFromImage() /
+// generateVeoClipFromImage() below are no longer called from this path but
+// are kept as-is — generateKling3Video() (used inside generatePremiumVideoClip)
+// is still called elsewhere (Professional plan's Hailuo fallback chain,
+// generatePremiumReelFromImage's mixed-reel fallback), so nothing here is
+// safe to delete.
 
-const VIDEO_TIMEOUT_MS          = 20 * 60 * 1000; // 20 minutes hard ceiling — 3 real clips (Grok/Kling/Veo) + concat can exceed 8 min
-const VIDEO_CLIP_DURATION       = 7;              // seconds per clip — must be uniform for xfade offset math
-const VIDEO_TRANSITION_DURATION = 0.5;             // seconds
+const VIDEO_TIMEOUT_MS          = 25 * 60 * 1000; // 25 minutes hard ceiling — Happy Horse observed ~10-12min in testing, plus 4 staged Gemini images before it
+const VIDEO_CLIP_DURATION       = 7;              // seconds — unused by this path now, kept only for generatePremiumVideoClip() below (preserved, not called from here)
+const VIDEO_TRANSITION_DURATION = 0.5;             // seconds — same as above
 
 const CAMERA_DIRECTIONS = [
   'CAMERA DIRECTION: slow, smooth push-in (dolly forward) toward the main subject, gradually revealing detail. Steady, cinematic pace, no cuts.',
   'CAMERA DIRECTION: static or nearly static close-up detail shot, minimal camera movement, sharp focus on texture and detail.',
   'CAMERA DIRECTION: slow pull-back (dolly out) revealing the full scene and surrounding context. Steady, cinematic pace, no cuts.',
+]; // unused by this path now, kept only for generatePremiumVideoClip() below
+
+// ── Staged images + Happy Horse config ──────────────────────────────────
+
+const STAGE_DIRECTIVES = [
+  'STAGE: initial/before state — show the subject in its starting condition, before any work or transformation.',
+  'STAGE: early progress — show active work or process happening, a clear mid-point moment of transformation.',
+  'STAGE: advanced progress — show the subject further along, closer to completion but not yet finished.',
+  'STAGE: final result — show the subject fully transformed, polished, complete, in its best possible state, hero shot lighting.',
 ];
+
+const HAPPYHORSE_MODEL            = 'alibaba/happyhorse-1.1';
+const HAPPYHORSE_RESOLUTION       = '720p';
+const HAPPYHORSE_DURATION         = 15;
+const HAPPYHORSE_ASPECT_RATIO     = '9:16';
+const HAPPYHORSE_POLL_INTERVAL_MS = 5000;
 
 export async function generatePremiumVideoFromImage(
   imagePath: string,
@@ -649,7 +674,7 @@ export async function generatePremiumVideoFromImage(
 ): Promise<{ video: string }> {
   const timeoutGuard = new Promise<never>((_, reject) =>
     setTimeout(
-      () => reject(new Error('[Timeout] generatePremiumVideoFromImage exceeded 20 minutes — process cancelled')),
+      () => reject(new Error('[Timeout] generatePremiumVideoFromImage exceeded 25 minutes — process cancelled')),
       VIDEO_TIMEOUT_MS,
     ),
   );
@@ -690,48 +715,211 @@ async function _runPremiumVideoFromImage(
       .toFile(baseImgPath);
   }
 
-  // ── 3 clips (~7s each), same base image/scene, distinct camera movement ────
-  const clips: string[] = [];
-  for (let i = 0; i < 3; i++) {
-    if (input?.visualConcept) {
-      const clipInput: ContentInput = {
-        ...input,
-        visualConcept: `${input.visualConcept}. ${CAMERA_DIRECTIONS[i]}`,
-      };
-      logger.info(`[ContentGen] Video — clip ${i + 1}/3: Grok → Kling 3.0 → Veo 2 → Ken Burns…`);
-      clips.push(await generatePremiumVideoClip(clipInput, baseImgPath, outputDir, i, VIDEO_CLIP_DURATION));
-    } else {
-      logger.info(`[ContentGen] Video — clip ${i + 1}/3: Ken Burns (no visualConcept)`);
-      const kb = path.join(outputDir, `_tmp_video_clip${i + 1}_kb.mp4`);
-      await kenBurnsVideo(baseImgPath, kb, 1080, 1920, VIDEO_CLIP_DURATION, null, 0.0015 + i * 0.0003);
-      clips.push(kb);
-    }
-  }
+  // ── 4 staged images (Gemini) + Happy Horse (Replicate, reference-to-video) ─
+  let videoPath:     string;
+  let totalDuration: number;
 
-  // ── Audio ─────────────────────────────────────────────────────────────────
-  const totalDuration = clips.length * VIDEO_CLIP_DURATION - (clips.length - 1) * VIDEO_TRANSITION_DURATION;
-  let audioReady = false;
   try {
-    await prepareAudio(audio, totalDuration);
-    audioReady = true;
-  } catch (err) {
-    logger.warn('[ContentGen] Video — audio failed:', (err as Error).message);
-  }
+    if (!input?.visualConcept) {
+      throw new Error('Sin visualConcept — no se puede generar la secuencia de imágenes etapificadas');
+    }
 
-  // ── Concat 3 clips with crossfade transitions ───────────────────────────────
-  logger.info('[ContentGen] Video — concatenating 3 clips with xfade…');
-  await concatWithXfade(
-    clips,
-    audioReady ? audio : null,
-    videoOut,
-    outputDir,
-    VIDEO_CLIP_DURATION,
-    VIDEO_TRANSITION_DURATION,
-    ['fade', 'slideup'],
-  );
+    logger.info('[ContentGen] Video — generando 4 imágenes etapificadas (Gemini)…');
+    const stagedImageUrls = await generateFourStagedImages(input, outputDir);
+
+    const progressionPrompt = buildHappyHorseProgressionPrompt(input.videoHook || input.copyText || '');
+    logger.info('[ContentGen] Video — Happy Horse (Replicate, reference-to-video)…');
+    videoPath     = await callHappyHorse(stagedImageUrls, progressionPrompt, outputDir);
+    totalDuration = HAPPYHORSE_DURATION;
+    logger.info('[ContentGen] Video — Happy Horse listo.');
+  } catch (err) {
+    logger.warn(`[ContentGen] Video — imágenes etapificadas/Happy Horse fallaron: ${(err as Error).message} — Ken Burns fallback`);
+
+    const fallbackImg = findLastStagedImage(outputDir) ?? baseImgPath;
+    logger.warn(`[ContentGen] Video — Ken Burns fallback usando: ${fallbackImg}`);
+
+    let audioReady = false;
+    try {
+      await prepareAudio(audio, HAPPYHORSE_DURATION);
+      audioReady = true;
+    } catch (audioErr) {
+      logger.warn('[ContentGen] Video — audio failed:', (audioErr as Error).message);
+    }
+
+    totalDuration = HAPPYHORSE_DURATION;
+    await kenBurnsVideo(fallbackImg, videoOut, 1080, 1920, totalDuration, audioReady ? audio : null, 0.0015);
+    videoPath = videoOut;
+  }
 
   logger.info(`[ContentGen] Premium video complete (~${totalDuration.toFixed(1)}s).`);
-  return { video: videoOut };
+  return { video: videoPath };
+}
+
+// ── 4 staged images (Gemini) — before / early progress / advanced progress /
+// final result ───────────────────────────────────────────────────────────
+//
+// Each stage reuses generateCleanBrandImage (same clean, no-text regeneration
+// already used for this function's own base image and for Hailuo's source
+// frame) with a stage-specific directive appended to visualConcept. Written
+// to outputDir/_tmp_video_stage{1-4}.jpg and returned as PUBLIC absolute
+// URLs (via imagePathToPublicUrl — same mechanism generateHailuoClip uses to
+// hand KIE.ai a fetchable image URL) since Happy Horse fetches them over the
+// network, not from local disk. allowSyntheticFallback=false: a Gemini/
+// DALL-E failure here must propagate instead of silently returning a flat
+// gradient — the caller's own Ken Burns fallback is the intended safety net.
+async function generateFourStagedImages(
+  input:     ContentInput,
+  outputDir: string,
+): Promise<string[]> {
+  const urls: string[] = [];
+
+  for (let i = 0; i < 4; i++) {
+    const stageInput: ContentInput = {
+      ...input,
+      visualConcept: `${input.visualConcept}. ${STAGE_DIRECTIVES[i]}. ${VIDEO_PROMPT_NEGATIVE_SUFFIX}`,
+    };
+
+    logger.info(`[ContentGen] Video — staged image ${i + 1}/4…`);
+    const buffer   = await generateCleanBrandImage(stageInput, 1080, 1920, false);
+    const filePath = path.join(outputDir, `_tmp_video_stage${i + 1}.jpg`);
+    fs.writeFileSync(filePath, buffer);
+
+    const publicUrl = imagePathToPublicUrl(filePath);
+    if (!publicUrl) {
+      throw new Error(`No se pudo construir una URL pública para ${filePath} (¿outputDir fuera de UPLOADS_DIR?)`);
+    }
+    urls.push(publicUrl);
+  }
+
+  return urls;
+}
+
+// Last staged image that actually made it to disk before a failure —
+// scanned directly from the filesystem (not from generateFourStagedImages'
+// return value) so a partial failure (e.g. stage 3/4 throwing) still finds
+// stages 1-2 on disk even though the function above threw before returning
+// anything.
+function findLastStagedImage(outputDir: string): string | null {
+  for (let i = 4; i >= 1; i--) {
+    const candidate = path.join(outputDir, `_tmp_video_stage${i}.jpg`);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+// ── Happy Horse 1.1 (Replicate, reference-to-video) ─────────────────────
+//
+// Same request/poll/download shape validated in scripts/test-happyhorse.js
+// (Sesión 22 + corrida-A/corrida-B, real runs): POST to the named-model
+// endpoint (latest version, no version hash needed), poll every 5s,
+// download the finished .mp4 to outputDir/premium_video.mp4.
+
+function buildHappyHorseProgressionPrompt(hookOrCopy: string): string {
+  const theme = hookOrCopy ? ` Overall theme/message: "${hookOrCopy}".` : '';
+  return (
+    'Progressive narrative sequence: ' +
+    '[Image 1] shows the initial state, [Image 2] shows active work in ' +
+    'progress, a clear mid-point moment of transformation, [Image 3] shows ' +
+    'further progress, closer to completion, [Image 4] reveals the final, ' +
+    'fully transformed result. Each image represents a distinct moment in ' +
+    'the process — avoid repeating the same action or camera angle across ' +
+    `images. Keep the same subject and setting consistent throughout.${theme}` +
+    VIDEO_PROMPT_NEGATIVE_SUFFIX
+  );
+}
+
+interface ReplicatePrediction {
+  id?:     string;
+  status?: string;
+  urls?:   { get?: string };
+  output?: unknown;
+  error?:  unknown;
+}
+
+async function callHappyHorse(
+  images:    string[],
+  prompt:    string,
+  outputDir: string,
+): Promise<string> {
+  const token = REPLICATE_API_TOKEN_ENV();
+  if (!token) {
+    throw new Error('REPLICATE_API_TOKEN no está configurado');
+  }
+
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+  const apiUrl = `https://api.replicate.com/v1/models/${HAPPYHORSE_MODEL}/predictions`;
+
+  logger.info('[HappyHorse] Creando predicción en Replicate…');
+  const createRes = await fetch(apiUrl, {
+    method:  'POST',
+    headers,
+    body: JSON.stringify({
+      input: {
+        prompt,
+        images,
+        resolution:   HAPPYHORSE_RESOLUTION,
+        duration:     HAPPYHORSE_DURATION,
+        aspect_ratio: HAPPYHORSE_ASPECT_RATIO,
+      },
+    }),
+  });
+  const created = await createRes.json() as ReplicatePrediction;
+  if (!createRes.ok) {
+    throw new Error(`Replicate rechazó la predicción (HTTP ${createRes.status}): ${JSON.stringify(created)}`);
+  }
+
+  const getUrl = created.urls?.get;
+  if (!getUrl) {
+    throw new Error(`La respuesta de Replicate no trae urls.get: ${JSON.stringify(created)}`);
+  }
+  logger.info(`[HappyHorse] prediction id: ${created.id} / status inicial: ${created.status}`);
+
+  let finished: ReplicatePrediction | undefined;
+  const startedAt = Date.now();
+  while (true) {
+    if (Date.now() - startedAt > VIDEO_TIMEOUT_MS) {
+      throw new Error(`Timeout esperando a Happy Horse (${VIDEO_TIMEOUT_MS / 1000}s)`);
+    }
+
+    const pollRes = await fetch(getUrl, { headers });
+    const body    = await pollRes.json() as ReplicatePrediction;
+    if (!pollRes.ok) {
+      throw new Error(`Fallo al pollear la predicción (HTTP ${pollRes.status}): ${JSON.stringify(body)}`);
+    }
+
+    logger.info(`[HappyHorse] status: ${body.status}`);
+    if (body.status === 'succeeded') { finished = body; break; }
+    if (body.status === 'failed' || body.status === 'canceled') {
+      throw new Error(`Predicción terminó en estado '${body.status}': ${JSON.stringify(body.error ?? body)}`);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, HAPPYHORSE_POLL_INTERVAL_MS));
+  }
+
+  const output   = finished!.output;
+  const videoUrl = typeof output === 'string'
+    ? output
+    : Array.isArray(output) && typeof output[0] === 'string'
+      ? output[0]
+      : null;
+  if (!videoUrl) {
+    throw new Error(`No se pudo extraer una URL de video del campo "output": ${JSON.stringify(output)}`);
+  }
+
+  logger.info(`[HappyHorse] Video generado: ${videoUrl}`);
+  const dlRes = await fetch(videoUrl);
+  if (!dlRes.ok) {
+    throw new Error(`Fallo al descargar el video final (HTTP ${dlRes.status}) desde ${videoUrl}`);
+  }
+
+  const videoOut = path.join(outputDir, 'premium_video.mp4');
+  const buffer   = Buffer.from(await dlRes.arrayBuffer());
+  fs.writeFileSync(videoOut, buffer);
+
+  return videoOut;
 }
 
 // ── Core: Composed branded image ───────────────────────────────────────────

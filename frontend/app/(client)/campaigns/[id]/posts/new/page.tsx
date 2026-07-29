@@ -95,7 +95,7 @@ export default function NewPostPage() {
   const pollingRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoGenStartRef = useRef<number | null>(null);
 
-  const VIDEO_POLL_TIMEOUT_MS = 15 * 60 * 1000;
+  const VIDEO_POLL_TIMEOUT_MS = 25 * 60 * 1000;
 
   useEffect(() => {
     Promise.allSettled([clients.getProfile(), clients.getReelUsage(), clients.getAttemptLimits()] as const)
