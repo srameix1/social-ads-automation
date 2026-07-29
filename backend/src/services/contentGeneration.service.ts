@@ -696,6 +696,18 @@ async function _runPremiumVideoFromImage(
   const audio       = path.join(outputDir, '_tmp_video_audio.mp3');
   const baseImgPath = path.join(outputDir, '_tmp_video_base.jpg');
 
+  // ── Clear stale staged images from a previous attempt on this same
+  // outputDir (selectVisual retries reuse it) — otherwise findLastStagedImage()
+  // could pick up a _tmp_video_stage3/4.jpg left over from an attempt that got
+  // further than this one, mixing runs. Same "fresh start" intent as
+  // baseImgPath/videoOut/audio above, just explicit here because those are
+  // always overwritten this run while a stage file might not be if this
+  // attempt fails before reaching it.
+  for (let i = 1; i <= 4; i++) {
+    const stale = path.join(outputDir, `_tmp_video_stage${i}.jpg`);
+    if (fs.existsSync(stale)) fs.unlinkSync(stale);
+  }
+
   // ── Single clean base image, reused across all 3 clips for scene continuity ─
   logger.info('[ContentGen] Video — base image: Gemini clean scene…');
   let baseImgReady = false;
