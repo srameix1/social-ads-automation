@@ -666,6 +666,7 @@ const HAPPYHORSE_RESOLUTION       = '720p';
 const HAPPYHORSE_DURATION         = 15;
 const HAPPYHORSE_ASPECT_RATIO     = '9:16';
 const HAPPYHORSE_POLL_INTERVAL_MS = 5000;
+const HAPPYHORSE_POLL_TIMEOUT_MS  = 18 * 60 * 1000; // 18 minutes — deliberately shorter than VIDEO_TIMEOUT_MS (25min): staged images take ~2-4min before this loop even starts, so this must leave the outer Promise.race enough headroom to still let the catch block's Ken Burns fallback run instead of getting killed mid-fallback
 
 export async function generatePremiumVideoFromImage(
   imagePath: string,
@@ -892,8 +893,8 @@ async function callHappyHorse(
   let finished: ReplicatePrediction | undefined;
   const startedAt = Date.now();
   while (true) {
-    if (Date.now() - startedAt > VIDEO_TIMEOUT_MS) {
-      throw new Error(`Timeout esperando a Happy Horse (${VIDEO_TIMEOUT_MS / 1000}s)`);
+    if (Date.now() - startedAt > HAPPYHORSE_POLL_TIMEOUT_MS) {
+      throw new Error(`Timeout esperando a Happy Horse (${HAPPYHORSE_POLL_TIMEOUT_MS / 1000}s)`);
     }
 
     const pollRes = await fetch(getUrl, { headers });
