@@ -11,6 +11,7 @@
     "postbuild": "node scripts/copy-assets.js",
     "start": "node dist/server.js",
     "test:gemini": "ts-node --transpile-only scripts/test-gemini.ts",
+    "test:gemini-image": "ts-node --transpile-only scripts/test-gemini-image.ts",
     "test:cliente-real": "node test/prueba-cliente-real.js",
     "test:3-planes": "node test/prueba-3-planes.js"
   },

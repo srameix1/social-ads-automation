@@ -1117,7 +1117,7 @@ async function generateCleanBrandImage(
     .toBuffer();
 }
 
-async function callGemini(
+export async function callGemini(
   input:  ContentInput,
   width:  number,
   height: number,
