@@ -2860,8 +2860,8 @@ export async function applyVideoOverlays(
     return (
       `drawtext=${fontFilePart}text='${escapeDrawtext(line)}':` +
       `fontsize=${fontSize}:fontcolor=white:` +
-      `shadowcolor=black:shadowx=3:shadowy=3:` +
-      `box=1:boxcolor=black@0.6:boxborderw=15:` +
+      `bordercolor=black:borderw=3:` +
+      `shadowcolor=black:shadowx=4:shadowy=4:` +
       `x=w*0.05:y=${yExpr}:fix_bounds=1`
     );
   });
