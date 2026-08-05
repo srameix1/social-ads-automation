@@ -4,9 +4,10 @@ import { query, queryOne } from '../../config/database';
 import {
   generateVisualVariations,
   generateVisualVariationsFromPhotos,
-  generateProfessionalVideosFromImage,
   generatePremiumVideoFromImage,
   generatePremiumReelFromImage,
+  generateReelSlideshow,
+  generateCleanBrandImage,
   ContentInput,
 } from '../../services/contentGeneration.service';
 import { logger } from '../../utils/logger';
@@ -26,6 +27,17 @@ interface Strategy {
   visual_concept: string;
   video_hook:     string | null;
 }
+
+// Light per-position prompt variation so the 5 Reel source images aren't
+// 5 identical copies of the same generateCleanBrandImage call — no progress
+// narrative (unlike STAGE_DIRECTIVES for Premium), just a different angle.
+const REEL_IMAGE_ANGLE_VARIATIONS = [
+  'Wide establishing angle of the scene.',
+  'Alternate angle, same subject and setting, different framing.',
+  'Closer framing on the main subject within the same scene.',
+  'Another alternate angle, same subject and setting.',
+  'Fresh perspective of the same scene, different composition.',
+];
 
 interface ClientProfile {
   plan:                  string | null;
@@ -124,7 +136,27 @@ export async function generateVideoForSelectedVariation(
     let videoUrl: string;
     if (format === 'animated_video') {
       const contentInput = await buildContentInputForPost(postId, variationId);
-      const { feed } = await generateProfessionalVideosFromImage(imagePath, outputDir, contentInput ?? undefined);
+
+      const reelImagePaths: string[] = [];
+      if (contentInput?.visualConcept) {
+        for (let i = 0; i < 5; i++) {
+          const variedInput: ContentInput = {
+            ...contentInput,
+            visualConcept: `${contentInput.visualConcept} ${REEL_IMAGE_ANGLE_VARIATIONS[i]}`,
+          };
+          const buffer  = await generateCleanBrandImage(variedInput, 1080, 1920);
+          const imgPath = path.join(outputDir, `_tmp_reel_src${i + 1}.jpg`);
+          fs.writeFileSync(imgPath, buffer);
+          reelImagePaths.push(imgPath);
+        }
+      } else {
+        // Sin visualConcept (estrategia sin datos suficientes) — reusa la
+        // imagen ya seleccionada para las 5 posiciones; generateReelSlideshow
+        // normaliza el aspect ratio de cada fuente internamente.
+        for (let i = 0; i < 5; i++) reelImagePaths.push(imagePath);
+      }
+
+      const { feed } = await generateReelSlideshow(reelImagePaths, outputDir);
       videoUrl = filePathToUrl(feed);
     } else if (format === 'reel') {
       const contentInput = await buildContentInputForPost(postId, variationId);
