@@ -546,13 +546,15 @@ export async function generateReelSlideshow(
   // Normalize every source to an exact 1080x1920 cover-crop first — kenBurnsVideo's
   // scale filter stretches to fit without preserving aspect ratio, so any
   // source that isn't already this exact size would come out distorted.
-  const clips: string[] = [];
+  const clips:    string[] = [];
+  const normImgs: string[] = [];
   for (let i = 0; i < 5; i++) {
     const normImg = path.join(outputDir, `_tmp_reel_norm${i + 1}.jpg`);
     await sharp(imagePaths[i])
       .resize(1080, 1920, { fit: 'cover', position: 'centre' })
       .jpeg({ quality: 92 })
       .toFile(normImg);
+    normImgs.push(normImg);
 
     const clipPath = path.join(outputDir, `_tmp_reel_clip${i + 1}.mp4`);
     logger.info(`[ContentGen] Reel — clip ${i + 1}/5 (${REEL_MODES[i]})…`);
@@ -571,7 +573,8 @@ export async function generateReelSlideshow(
     ['fade', 'slideup', 'fade', 'slideup'],
   );
 
-  for (const c of clips) { try { fs.unlinkSync(c); } catch { /* ignore */ } }
+  for (const c of clips)    { try { fs.unlinkSync(c); } catch { /* ignore */ } }
+  for (const n of normImgs) { try { fs.unlinkSync(n); } catch { /* ignore */ } }
 
   logger.info(`[ContentGen] Reel slideshow complete (~${totalDuration.toFixed(1)}s).`);
   return { feed: feedOut };

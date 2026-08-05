@@ -139,7 +139,8 @@ export async function publishVariation(
       // images with a light per-position prompt variation, then a single
       // crossfaded Ken Burns video used for every platform (no separate
       // square feed vs. vertical story split anymore).
-      const reelImagePaths: string[] = [];
+      const reelImagePaths:  string[] = [];
+      const reelSrcTmpPaths: string[] = [];
       if (strategy.visual_concept) {
         const reelContentInput: ContentInput = {
           businessName:   clientProfile.business_name ?? 'Negocio',
@@ -162,15 +163,22 @@ export async function publishVariation(
           const imgPath = path.join(pubDir, `_tmp_reel_src${i + 1}.jpg`);
           fs.writeFileSync(imgPath, buffer);
           reelImagePaths.push(imgPath);
+          reelSrcTmpPaths.push(imgPath);
         }
       } else {
         // Sin visual_concept — reusa la imagen de la variación seleccionada
         // para las 5 posiciones; generateReelSlideshow normaliza el aspect
-        // ratio de cada fuente internamente.
+        // ratio de cada fuente internamente. No es un temporal — no va en
+        // reelSrcTmpPaths, no se borra.
         for (let i = 0; i < 5; i++) reelImagePaths.push(variationImagePath);
       }
 
-      const { feed } = await generateReelSlideshow(reelImagePaths, pubDir);
+      let feed: string;
+      try {
+        ({ feed } = await generateReelSlideshow(reelImagePaths, pubDir));
+      } finally {
+        for (const p of reelSrcTmpPaths) { try { fs.unlinkSync(p); } catch { /* ignore */ } }
+      }
       for (const p of campaign.platforms) platformUrls[p] = filePathToUrl(feed);
 
     } else {

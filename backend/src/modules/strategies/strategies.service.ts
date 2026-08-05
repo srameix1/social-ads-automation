@@ -127,7 +127,8 @@ export async function generateVideoForSelectedVariation(
     if (format === 'animated_video') {
       const contentInput = await buildContentInputForPost(postId, variationId);
 
-      const reelImagePaths: string[] = [];
+      const reelImagePaths:  string[] = [];
+      const reelSrcTmpPaths: string[] = [];
       if (contentInput?.visualConcept) {
         for (let i = 0; i < 5; i++) {
           const variedInput: ContentInput = {
@@ -138,15 +139,22 @@ export async function generateVideoForSelectedVariation(
           const imgPath = path.join(outputDir, `_tmp_reel_src${i + 1}.jpg`);
           fs.writeFileSync(imgPath, buffer);
           reelImagePaths.push(imgPath);
+          reelSrcTmpPaths.push(imgPath);
         }
       } else {
         // Sin visualConcept (estrategia sin datos suficientes) — reusa la
         // imagen ya seleccionada para las 5 posiciones; generateReelSlideshow
-        // normaliza el aspect ratio de cada fuente internamente.
+        // normaliza el aspect ratio de cada fuente internamente. No es un
+        // temporal — no va en reelSrcTmpPaths, no se borra.
         for (let i = 0; i < 5; i++) reelImagePaths.push(imagePath);
       }
 
-      const { feed } = await generateReelSlideshow(reelImagePaths, outputDir);
+      let feed: string;
+      try {
+        ({ feed } = await generateReelSlideshow(reelImagePaths, outputDir));
+      } finally {
+        for (const p of reelSrcTmpPaths) { try { fs.unlinkSync(p); } catch { /* ignore */ } }
+      }
       videoUrl = filePathToUrl(feed);
     } else if (format === 'reel') {
       const contentInput = await buildContentInputForPost(postId, variationId);
