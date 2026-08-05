@@ -508,6 +508,19 @@ const REEL_TRANSITION_DURATION = 0.6; // seconds per crossfade
 const REEL_MODES: Array<'zoom-in' | 'zoom-out' | 'pan-left-to-right'> =
   ['zoom-in', 'pan-left-to-right', 'zoom-out', 'pan-left-to-right', 'zoom-in'];
 
+// Light per-position prompt variation so the 5 Reel source images aren't
+// 5 identical copies of the same generateCleanBrandImage call — no progress
+// narrative (unlike STAGE_DIRECTIVES for Premium), just a different angle.
+// Shared by both callers of generateReelSlideshow (strategies.service.ts's
+// per-post flow and variations.service.ts's legacy campaign-level flow).
+export const REEL_IMAGE_ANGLE_VARIATIONS = [
+  'Wide establishing angle of the scene.',
+  'Alternate angle, same subject and setting, different framing.',
+  'Closer framing on the main subject within the same scene.',
+  'Another alternate angle, same subject and setting.',
+  'Fresh perspective of the same scene, different composition.',
+];
+
 export async function generateReelSlideshow(
   imagePaths: string[],
   outputDir:  string,

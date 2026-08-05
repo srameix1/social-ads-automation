@@ -3,8 +3,10 @@ import path from 'path';
 import { query, queryOne } from '../../config/database';
 import { createError }     from '../../middleware/errorHandler';
 import {
-  generateProfessionalVideosFromImage,
   generatePremiumReelFromImage,
+  generateReelSlideshow,
+  generateCleanBrandImage,
+  REEL_IMAGE_ANGLE_VARIATIONS,
   ContentInput,
 } from '../../services/contentGeneration.service';
 import { publishToInstagram } from '../../services/instagram.service';
@@ -132,9 +134,44 @@ export async function publishVariation(
       for (const p of campaign.platforms) platformUrls[p] = filePathToUrl(reel);
 
     } else if (plan === 'professional') {
-      const { feed, story } = await generateProfessionalVideosFromImage(variationImagePath, pubDir);
-      for (const p of campaign.platforms)
-        platformUrls[p] = p === 'tiktok' ? filePathToUrl(story) : filePathToUrl(feed);
+      // FFmpeg-only Reel slideshow (replaces Hailuo/Kling) — same pattern as
+      // strategies.service.ts's generateVideoForSelectedVariation: 5 clean
+      // images with a light per-position prompt variation, then a single
+      // crossfaded Ken Burns video used for every platform (no separate
+      // square feed vs. vertical story split anymore).
+      const reelImagePaths: string[] = [];
+      if (strategy.visual_concept) {
+        const reelContentInput: ContentInput = {
+          businessName:   clientProfile.business_name ?? 'Negocio',
+          description:    clientProfile.description ?? undefined,
+          visualConcept:  strategy.visual_concept,
+          copyText:       strategy.copy_text,
+          primaryColor,
+          secondaryColor: clientProfile.brand_secondary_color ?? undefined,
+          logoBuffer,
+          clientPhotos,
+          outputDir:      '',
+          campaignId:     campaign.id,
+        };
+        for (let i = 0; i < 5; i++) {
+          const variedInput: ContentInput = {
+            ...reelContentInput,
+            visualConcept: `${reelContentInput.visualConcept} ${REEL_IMAGE_ANGLE_VARIATIONS[i]}`,
+          };
+          const buffer  = await generateCleanBrandImage(variedInput, 1080, 1920);
+          const imgPath = path.join(pubDir, `_tmp_reel_src${i + 1}.jpg`);
+          fs.writeFileSync(imgPath, buffer);
+          reelImagePaths.push(imgPath);
+        }
+      } else {
+        // Sin visual_concept — reusa la imagen de la variación seleccionada
+        // para las 5 posiciones; generateReelSlideshow normaliza el aspect
+        // ratio de cada fuente internamente.
+        for (let i = 0; i < 5; i++) reelImagePaths.push(variationImagePath);
+      }
+
+      const { feed } = await generateReelSlideshow(reelImagePaths, pubDir);
+      for (const p of campaign.platforms) platformUrls[p] = filePathToUrl(feed);
 
     } else {
       // Basic: variation image IS the feed; create a 1080x1920 story crop
