@@ -153,15 +153,24 @@ export async function checkTikTokPublishStatus(
   const data = await res.json() as {
     data: {
       status?: TikTokPublishStatus;
-      publicaly_available_post_id?: number[];
+      publicly_available_post_id?: number[];
+      publicaly_available_post_id?: number[]; // typo viejo — TikTok podría seguir mandando este nombre
       fail_reason?: string;
     };
   };
 
   const status = data.data.status ?? 'FAILED';
-  const postId = data.data.publicaly_available_post_id?.[0]?.toString() ?? null;
+  const postId = data.data.publicly_available_post_id?.[0]?.toString()
+    ?? data.data.publicaly_available_post_id?.[0]?.toString()
+    ?? null;
 
   logger.debug(`[TikTok] Estado de publish_id ${publishId}: ${status}`);
+
+  // TEMPORAL — sacar después de confirmar en el próximo PUBLISH_COMPLETE real
+  // qué nombre de campo manda TikTok de verdad para el ID público del post.
+  if (status === 'PUBLISH_COMPLETE') {
+    logger.info(`[TikTok DEBUG TEMP] Respuesta cruda de status/fetch para publish_id=${publishId}: ${JSON.stringify(data)}`);
+  }
 
   return { status, postId, failReason: data.data.fail_reason };
 }
