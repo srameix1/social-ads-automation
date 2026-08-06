@@ -203,17 +203,18 @@ export interface CampaignWithPosts extends Campaign {
 export type CampaignWithDetail = CampaignWithPosts;
 
 export interface Publication {
-  id:             string;
-  campaign_id:    string;
-  strategy_id:    string;
-  media_asset_id: string | null;
-  platform:       string;
-  status:         'pending' | 'published' | 'failed';
-  post_id:        string | null;
-  post_url:       string | null;
-  error_message:  string | null;
-  published_at:   string | null;
-  created_at:     string;
+  id:                string;
+  campaign_id:       string;
+  strategy_id:       string;
+  media_asset_id:    string | null;
+  internal_post_id:  string | null;
+  platform:          string;
+  status:            'pending' | 'processing' | 'published' | 'failed';
+  post_id:           string | null;
+  post_url:          string | null;
+  error_message:     string | null;
+  published_at:      string | null;
+  created_at:        string;
 }
 
 export interface SubscriptionStatus {

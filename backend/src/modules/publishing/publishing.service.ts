@@ -2,17 +2,18 @@ import { query, queryOne } from '../../config/database';
 import { createError } from '../../middleware/errorHandler';
 
 export interface Publication {
-  id:              string;
-  campaign_id:     string;
-  strategy_id:     string;
-  media_asset_id:  string | null;
-  platform:        string;
-  status:          string;
-  post_id:         string | null;
-  post_url:        string | null;
-  error_message:   string | null;
-  published_at:    string | null;
-  created_at:      string;
+  id:                string;
+  campaign_id:       string;
+  strategy_id:       string;
+  media_asset_id:    string | null;
+  internal_post_id:  string | null;
+  platform:          string;
+  status:            string;
+  post_id:           string | null;
+  post_url:          string | null;
+  error_message:     string | null;
+  published_at:      string | null;
+  created_at:        string;
 }
 
 export async function getPublications(campaignId: string, clientId: string): Promise<Publication[]> {

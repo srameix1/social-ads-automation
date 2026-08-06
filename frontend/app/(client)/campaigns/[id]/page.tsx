@@ -1,13 +1,16 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useCampaign } from '@/hooks/useCampaigns';
+import { campaigns as campaignsApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { PostsList } from '@/components/client/PostsList';
 import { PageLoader } from '@/components/ui/Spinner';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LOCALE_MAP } from '@/lib/i18n';
+import type { Publication } from '@/lib/types';
 
 const PLATFORM_ICONS: Record<string, string> = {
   instagram: '📸', tiktok: '🎵', facebook: '👥',
@@ -17,6 +20,15 @@ export default function CampaignDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { campaign, loading } = useCampaign(id);
   const { lang, t } = useLanguage();
+
+  // Una sola carga a nivel de campaña — PostsList agrupa client-side por post,
+  // no hace falta pedir publications por cada post individual.
+  const [publications, setPublications] = useState<Publication[]>([]);
+  useEffect(() => {
+    campaignsApi.getPublications(id)
+      .then(d => setPublications(d.publications))
+      .catch(() => setPublications([])); // sin publicaciones todavía no es un error
+  }, [id]);
 
   if (loading) return <PageLoader />;
   if (!campaign) return (
@@ -90,7 +102,7 @@ export default function CampaignDetailPage() {
             </Button>
           </Link>
         </div>
-        <PostsList posts={campaign.posts ?? []} campaignId={id} />
+        <PostsList posts={campaign.posts ?? []} campaignId={id} publications={publications} />
       </div>
     </div>
   );

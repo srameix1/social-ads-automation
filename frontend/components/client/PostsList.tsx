@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import type { Post } from '@/lib/types';
+import type { Post, Publication } from '@/lib/types';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LOCALE_MAP } from '@/lib/i18n';
 
@@ -46,20 +46,47 @@ const IN_PROGRESS_STATUSES = new Set([
   'generating_visuals', 'visuals_ready', 'visuals_failed', 'visual_selected', 'generating_video',
 ]);
 
+// Fuente de verdad del indicador por plataforma: SOLO publications.status.
+// post_id/post_url nunca se usan para decidir el color — un post puede estar
+// realmente 'published' con post_id vacío (ej. contenido SELF_ONLY de TikTok
+// no siempre trae un ID público). post_url, si está, es solo un link opcional.
+const PUB_DOT_STYLES: Record<string, string> = {
+  published:  'bg-emerald-400',
+  failed:     'bg-rose-400',
+  processing: 'bg-amber-400',
+  pending:    'bg-slate-500',
+};
+
 interface Props {
-  posts:      Post[];
-  campaignId: string;
+  posts:         Post[];
+  campaignId:    string;
+  publications?: Publication[];
 }
 
 function isVideoFormat(format: string): boolean {
   return format === 'animated_video' || format === 'reel';
 }
 
-export function PostsList({ posts, campaignId }: Props) {
+export function PostsList({ posts, campaignId, publications = [] }: Props) {
   const { lang, t } = useLanguage();
   const WORKFLOW_STYLES = useWorkflowStyles(t);
   const STATUS_STYLES   = useStatusStyles(t);
   const [previewPost, setPreviewPost] = useState<Post | null>(null);
+
+  const pubStatusLabel = (status: Publication['status']): string =>
+    status === 'published'  ? t('posts_status_published')
+    : status === 'failed'     ? t('posts_status_failed')
+    : status === 'processing' ? t('posts_status_publishing')
+    : t('pub_pending');
+
+  // internal_post_id -> sus filas de publications (una por plataforma).
+  const pubsByPost = new Map<string, Publication[]>();
+  for (const pub of publications) {
+    if (!pub.internal_post_id) continue;
+    const list = pubsByPost.get(pub.internal_post_id) ?? [];
+    list.push(pub);
+    pubsByPost.set(pub.internal_post_id, list);
+  }
 
   if (!posts.length) {
     return (
@@ -81,6 +108,7 @@ export function PostsList({ posts, campaignId }: Props) {
           const hasMedia    = !!post.selected_visual_url;
           const platforms   = post.platforms?.length ? post.platforms : (post.platform ? [post.platform] : []);
           const isVideo     = isVideoFormat(post.format);
+          const postPubs    = pubsByPost.get(post.id) ?? [];
 
           return (
             <div key={post.id} className="flex items-center gap-4 px-5 py-3">
@@ -111,9 +139,27 @@ export function PostsList({ posts, campaignId }: Props) {
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {platforms.map(p => (
-                    <span key={p} title={p} className="text-sm">{PLATFORM_ICONS[p] ?? '🌐'}</span>
-                  ))}
+                  {platforms.map(p => {
+                    const pub    = postPubs.find(pub => pub.platform === p);
+                    // Sin publications para este post todavía (ej. delivery_mode
+                    // manual, nunca confirmado) — ícono plano, sin punto de estado,
+                    // no un error.
+                    const dot    = postPubs.length > 0 ? PUB_DOT_STYLES[pub?.status ?? 'pending'] : null;
+                    const title  = postPubs.length > 0 ? `${p} — ${pubStatusLabel(pub?.status ?? 'pending')}` : p;
+                    const icon   = (
+                      <span title={title} className="relative inline-flex text-sm">
+                        {PLATFORM_ICONS[p] ?? '🌐'}
+                        {dot && (
+                          <span className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full border border-slate-900 ${dot}`} />
+                        )}
+                      </span>
+                    );
+                    return pub?.status === 'published' && pub.post_url ? (
+                      <a key={p} href={pub.post_url} target="_blank" rel="noopener noreferrer">{icon}</a>
+                    ) : (
+                      <span key={p}>{icon}</span>
+                    );
+                  })}
                   <span className="text-xs text-slate-500">{FORMAT_ICONS[post.format]}</span>
                 </div>
                 {post.scheduled_date && (
