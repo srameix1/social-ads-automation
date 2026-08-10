@@ -166,11 +166,5 @@ export async function checkTikTokPublishStatus(
 
   logger.debug(`[TikTok] Estado de publish_id ${publishId}: ${status}`);
 
-  // TEMPORAL — sacar después de confirmar en el próximo PUBLISH_COMPLETE real
-  // qué nombre de campo manda TikTok de verdad para el ID público del post.
-  if (status === 'PUBLISH_COMPLETE') {
-    logger.info(`[TikTok DEBUG TEMP] Respuesta cruda de status/fetch para publish_id=${publishId}: ${JSON.stringify(data)}`);
-  }
-
   return { status, postId, failReason: data.data.fail_reason };
 }
