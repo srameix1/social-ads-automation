@@ -5,7 +5,7 @@ import { query, queryOne } from '../../config/database';
 import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 
-const FB_GRAPH = 'https://graph.facebook.com/v18.0';
+const FB_GRAPH = 'https://graph.facebook.com/v26.0';
 // Instagram scopes: instagram_business_basic e instagram_business_content_publish
 // funcionan en modo Development para admins/testers de la app sin necesitar
 // App Review. Al aprobarse el Review, funcionan automáticamente para clientes reales.
