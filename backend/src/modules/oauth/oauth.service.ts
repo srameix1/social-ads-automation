@@ -6,7 +6,7 @@ import { encrypt } from '../../utils/encryption';
 import { logger } from '../../utils/logger';
 
 const FB_GRAPH = 'https://graph.facebook.com/v26.0';
-// Instagram scopes: instagram_business_basic e instagram_business_content_publish
+// Instagram scopes: instagram_basic e instagram_content_publish
 // funcionan en modo Development para admins/testers de la app sin necesitar
 // App Review. Al aprobarse el Review, funcionan automáticamente para clientes reales.
 const FB_SCOPE = 'pages_manage_posts,pages_read_engagement,pages_show_list,business_management,instagram_basic,instagram_content_publish';
