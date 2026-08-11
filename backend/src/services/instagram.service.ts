@@ -26,7 +26,7 @@ async function waitForContainerReady(
   creationId:   string,
   access_token: string,
 ): Promise<void> {
-  const maxAttempts = 60; // ~2 minutos con 5s de espera
+  const maxAttempts = 60; // ~5 minutos con 5s de espera
   for (let i = 0; i < maxAttempts; i++) {
     const res  = await fetch(`${baseUrl}/${creationId}?fields=status_code&access_token=${access_token}`);
     const data = await res.json() as { status_code?: string };
@@ -36,7 +36,7 @@ async function waitForContainerReady(
     }
     await new Promise(r => setTimeout(r, 5000));
   }
-  throw new Error('Instagram container timeout esperando FINISHED (2 min)');
+  throw new Error('Instagram container timeout esperando FINISHED (5 min)');
 }
 
 export async function publishToInstagram(
