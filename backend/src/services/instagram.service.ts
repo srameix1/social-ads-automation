@@ -21,6 +21,11 @@ export interface PublishResult {
   postUrl: string;
 }
 
+// No tiene más callers desde este archivo — la espera bloqueante de 5 min se
+// reemplazó por polling asíncrono vía pg-boss (ver instagram-check-status en
+// publishPost.job.ts), igual que ya existía para TikTok. Se deja sin borrar
+// por si hace falta como referencia; mismo criterio que otras funciones
+// huérfanas del proyecto.
 async function waitForContainerReady(
   baseUrl:      string,
   creationId:   string,
@@ -39,16 +44,20 @@ async function waitForContainerReady(
   throw new Error('Instagram container timeout esperando FINISHED (5 min)');
 }
 
-export async function publishToInstagram(
+export interface CreateContainerResult {
+  creationId: string;
+  isVideo:    boolean;
+}
+
+export async function createInstagramContainer(
   credentials: InstagramCredentials,
   mediaUrl:    string,
   caption:     string,
-): Promise<PublishResult> {
+): Promise<CreateContainerResult> {
   const { access_token, instagram_account_id } = credentials;
   const baseUrl = `${GRAPH_URL}/${instagram_account_id}`;
   const isVideo = /\.(mp4|mov)$/i.test(mediaUrl);
 
-  // Paso 1: Crear container de media
   const containerRes = await fetch(`${baseUrl}/media`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -76,13 +85,39 @@ export async function publishToInstagram(
   const { id: creationId } = await containerRes.json() as { id: string };
   logger.debug('[Instagram] Container creado:', creationId);
 
-  if (isVideo) {
-    logger.info(`[Instagram] Esperando procesamiento del container: ${creationId}`);
-    await waitForContainerReady(baseUrl, creationId, access_token);
-    logger.info(`[Instagram] Container listo, publicando: ${creationId}`);
+  return { creationId, isVideo };
+}
+
+export interface ContainerStatusResult {
+  // Valores documentados por Graph API: IN_PROGRESS, FINISHED, ERROR, EXPIRED,
+  // PUBLISHED. Cualquier otro valor (o ausente) se trata como "sigue en progreso".
+  statusCode: string | null;
+  // Campo "status" — texto descriptivo, puede traer más detalle que status_code.
+  statusText: string | null;
+}
+
+export async function checkInstagramContainerStatus(
+  instagramAccountId: string,
+  creationId:          string,
+  accessToken:         string,
+): Promise<ContainerStatusResult> {
+  const res  = await fetch(`${GRAPH_URL}/${creationId}?fields=status_code,status&access_token=${accessToken}`);
+  const data = await res.json() as { status_code?: string; status?: string; error?: { message: string } };
+
+  if (!res.ok) {
+    throw new Error(`Instagram container status error: ${data.error?.message ?? res.statusText}`);
   }
 
-  // Paso 2: Publicar el container
+  return { statusCode: data.status_code ?? null, statusText: data.status ?? null };
+}
+
+export async function publishInstagramContainer(
+  credentials: InstagramCredentials,
+  creationId:  string,
+): Promise<PublishResult> {
+  const { access_token, instagram_account_id } = credentials;
+  const baseUrl = `${GRAPH_URL}/${instagram_account_id}`;
+
   const publishRes = await fetch(`${baseUrl}/media_publish`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -102,4 +137,27 @@ export async function publishToInstagram(
 
   logger.info('[Instagram] Publicado exitosamente:', postId);
   return { postId, postUrl };
+}
+
+// Compone las dos funciones de arriba — se mantiene para publishToSocialMedia
+// (variations.service.ts), que publica de forma síncrona fuera de la cola de
+// pg-boss y espera el resultado final en la misma llamada. El flujo por cola
+// (publishPost.job.ts) ya no pasa por acá para video: usa createInstagramContainer
+// + instagram-check-status + publishInstagramContainer por separado.
+export async function publishToInstagram(
+  credentials: InstagramCredentials,
+  mediaUrl:    string,
+  caption:     string,
+): Promise<PublishResult> {
+  const { access_token, instagram_account_id } = credentials;
+  const baseUrl = `${GRAPH_URL}/${instagram_account_id}`;
+  const { creationId, isVideo } = await createInstagramContainer(credentials, mediaUrl, caption);
+
+  if (isVideo) {
+    logger.info(`[Instagram] Esperando procesamiento del container: ${creationId}`);
+    await waitForContainerReady(baseUrl, creationId, access_token);
+    logger.info(`[Instagram] Container listo, publicando: ${creationId}`);
+  }
+
+  return publishInstagramContainer(credentials, creationId);
 }

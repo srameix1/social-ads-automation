@@ -57,6 +57,16 @@ const PUB_DOT_STYLES: Record<string, string> = {
   pending:    'bg-slate-500',
 };
 
+// El polling de instagram-check-status corre cada 30s hasta 10 min — pasados
+// los primeros 3 min sin confirmar, avisamos que es un procesamiento largo
+// (no un error) en vez de mostrar el mismo "Publicando" genérico.
+const INSTAGRAM_SLOW_PROCESSING_MS = 3 * 60 * 1000;
+
+function isInstagramProcessingSlow(pub: Publication | undefined): boolean {
+  if (!pub || pub.platform !== 'instagram' || pub.status !== 'processing') return false;
+  return Date.now() - new Date(pub.created_at).getTime() > INSTAGRAM_SLOW_PROCESSING_MS;
+}
+
 interface Props {
   posts:         Post[];
   campaignId:    string;
@@ -145,7 +155,10 @@ export function PostsList({ posts, campaignId, publications = [] }: Props) {
                     // manual, nunca confirmado) — ícono plano, sin punto de estado,
                     // no un error.
                     const dot    = postPubs.length > 0 ? PUB_DOT_STYLES[pub?.status ?? 'pending'] : null;
-                    const title  = postPubs.length > 0 ? `${p} — ${pubStatusLabel(pub?.status ?? 'pending')}` : p;
+                    const slow   = isInstagramProcessingSlow(pub);
+                    const title  = postPubs.length > 0
+                      ? (slow ? t('posts_instagram_processing_slow') : `${p} — ${pubStatusLabel(pub?.status ?? 'pending')}`)
+                      : p;
                     const icon   = (
                       <span title={title} className="relative inline-flex text-sm">
                         {PLATFORM_ICONS[p] ?? '🌐'}

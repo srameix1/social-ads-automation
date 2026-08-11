@@ -4,7 +4,12 @@ import { getBoss } from '../config/pgboss';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 import { getDecryptedCredentials } from '../modules/credentials/credentials.service';
-import { publishToInstagram } from '../services/instagram.service';
+import {
+  createInstagramContainer,
+  checkInstagramContainerStatus,
+  publishInstagramContainer,
+  InstagramCredentials,
+} from '../services/instagram.service';
 import { publishToTikTok, checkTikTokPublishStatus, TikTokCredentials, TikTokMediaType } from '../services/tiktok.service';
 import { publishToFacebook } from '../services/facebook.service';
 
@@ -16,6 +21,13 @@ type Boss = Awaited<ReturnType<typeof getBoss>>;
 const TIKTOK_MAX_ATTEMPTS             = 60;
 const TIKTOK_CHECK_BACKOFF_BASE_SECS  = 15;
 const TIKTOK_CHECK_BACKOFF_CAP_SECS   = 300;
+
+// Reintentos del chequeo de estado de Instagram — a diferencia de TikTok, acá
+// el intervalo es fijo (no exponencial): el procesamiento de Reels suele ser
+// más predecible y corto que la moderación de TikTok. 20 intentos × 30s = 10 min.
+const INSTAGRAM_CHECK_INITIAL_DELAY_SECS = 30;
+const INSTAGRAM_CHECK_INTERVAL_SECS      = 30;
+const INSTAGRAM_CHECK_MAX_ATTEMPTS       = 20;
 
 // Subconjunto de Post (posts.service.ts) — se define localmente para evitar
 // un import circular entre posts.service.ts y este archivo.
@@ -44,6 +56,18 @@ interface TikTokCheckJobData {
   openId:        string;
   mediaType:     TikTokMediaType;
   attempt:       number;
+}
+
+interface InstagramCheckJobData {
+  publicationId:       string;
+  clientId:            string;
+  containerId:         string;
+  // No la usa el chequeo en sí (el container ya la lleva incrustada desde la
+  // creación) — se guarda en el job data para que quede visible en la tabla
+  // de pg-boss si hay que revisar manualmente un job atascado.
+  caption:             string;
+  instagramAccountId:  string;
+  attempt:             number;
 }
 
 // ── Encolar (llamado desde confirmPost) ────────────────────────────────────
@@ -226,7 +250,29 @@ async function handlePublishPost(jobs: Array<{ data: PublishJobData }>): Promise
 
     let result: { postId: string; postUrl: string };
     if (platform === 'instagram') {
-      result = await publishToInstagram(creds as unknown as Parameters<typeof publishToInstagram>[0], mediaUrl, caption);
+      const instagramCreds = creds as unknown as InstagramCredentials;
+      const { creationId, isVideo } = await createInstagramContainer(instagramCreds, mediaUrl, caption);
+
+      if (isVideo) {
+        // Container creado — no se espera acá de forma bloqueante (eso era lo que
+        // podía perder el creationId si el timeout de 5 min se cumplía antes de
+        // publicar). Se persiste de inmediato y el resto lo maneja
+        // instagram-check-status, mismo patrón que TikTok guarda
+        // post_id = publishId antes de encolar tiktok-check-status.
+        await query('UPDATE publications SET container_id = $1 WHERE id = $2', [creationId, publicationId]);
+
+        const boss = await getBoss();
+        const data: InstagramCheckJobData = {
+          publicationId, clientId, containerId: creationId, caption,
+          instagramAccountId: instagramCreds.instagram_account_id, attempt: 0,
+        };
+        await boss.sendAfter('instagram-check-status', data, null, INSTAGRAM_CHECK_INITIAL_DELAY_SECS);
+        logger.info(`[publishPost] Instagram container=${creationId} — esperando confirmación (publicationId=${publicationId})`);
+        return; // alreadyPublished se marca recién cuando instagram-check-status confirme
+      }
+
+      // Imagen: no hay procesamiento asíncrono de por medio, se publica directo.
+      result = await publishInstagramContainer(instagramCreds, creationId);
     } else if (platform === 'facebook') {
       result = await publishToFacebook(creds as unknown as Parameters<typeof publishToFacebook>[0], mediaUrl, caption);
     } else {
@@ -315,6 +361,67 @@ async function handleTikTokCheckStatus(jobs: Array<{ data: TikTokCheckJobData }>
   logger.debug(`[tiktokCheckStatus] Sigue en ${result.status} — próximo chequeo en ${delaySeconds}s (intento ${nextAttempt})`);
 }
 
+// ── Worker: instagram-check-status (cadena de sendAfter) ───────────────────
+
+async function handleInstagramCheckStatus(jobs: Array<{ data: InstagramCheckJobData }>): Promise<void> {
+  const { publicationId, clientId, containerId, caption, instagramAccountId, attempt } = jobs[0].data;
+
+  const creds  = await getDecryptedCredentials(clientId, 'instagram') as unknown as InstagramCredentials;
+  const result = await checkInstagramContainerStatus(instagramAccountId, containerId, creds.access_token);
+
+  if (result.statusCode === 'FINISHED') {
+    try {
+      const { postId, postUrl } = await publishInstagramContainer(creds, containerId);
+      await query(
+        `UPDATE publications SET status = 'published', post_id = $1, post_url = $2, published_at = NOW() WHERE id = $3`,
+        [postId, postUrl, publicationId],
+      );
+      logger.info(`[instagramCheckStatus] Confirmado y publicado — post_id=${postId} (publicationId=${publicationId})`);
+    } catch (err) {
+      // Container listo pero media_publish falló acá: no se relanza el error,
+      // porque pg-boss reintentaría este job completo y volvería a llamar a
+      // publishInstagramContainer sobre un container que quizás ya se publicó
+      // — mismo riesgo de duplicado que handlePublishPost evita con
+      // alreadyPublished para el resto de las plataformas. Se marca 'failed'
+      // para revisión manual — la caption queda en el job data de pg-boss
+      // por si hay que reconstruir el post a mano.
+      const message = (err as Error).message;
+      await query(
+        "UPDATE publications SET status = 'failed', error_message = $1 WHERE id = $2",
+        [message, publicationId],
+      );
+      logger.error(`[instagramCheckStatus] Container FINISHED pero falló media_publish (publicationId=${publicationId}): ${message}`);
+    }
+    return;
+  }
+
+  if (result.statusCode === 'ERROR') {
+    await query(
+      "UPDATE publications SET status = 'failed', error_message = $1 WHERE id = $2",
+      [result.statusText ?? 'Instagram reportó ERROR al procesar el container', publicationId],
+    );
+    logger.error(`[instagramCheckStatus] Instagram reportó ERROR (publicationId=${publicationId}): ${result.statusText}`);
+    return;
+  }
+
+  const nextAttempt = attempt + 1;
+  if (nextAttempt >= INSTAGRAM_CHECK_MAX_ATTEMPTS) {
+    await query(
+      "UPDATE publications SET status = 'failed', error_message = $1 WHERE id = $2",
+      ['Instagram no confirmó el procesamiento del video en 10 minutos — puede requerir revisión manual', publicationId],
+    );
+    logger.error(`[instagramCheckStatus] Timeout tras ${INSTAGRAM_CHECK_MAX_ATTEMPTS} intentos (publicationId=${publicationId})`);
+    return;
+  }
+
+  const boss = await getBoss();
+  const data: InstagramCheckJobData = {
+    publicationId, clientId, containerId, caption, instagramAccountId, attempt: nextAttempt,
+  };
+  await boss.sendAfter('instagram-check-status', data, null, INSTAGRAM_CHECK_INTERVAL_SECS);
+  logger.debug(`[instagramCheckStatus] Sigue en ${result.statusCode ?? 'sin status_code'} — próximo chequeo en ${INSTAGRAM_CHECK_INTERVAL_SECS}s (intento ${nextAttempt})`);
+}
+
 // ── Registro (llamado una vez desde server.ts al iniciar) ─────────────────
 
 export async function registerPublishPostWorker(boss: Boss): Promise<void> {
@@ -328,7 +435,13 @@ export async function registerPublishPostWorker(boss: Boss): Promise<void> {
     retryBackoff:    true,
     expireInSeconds: 60,
   });
+  await boss.createQueue('instagram-check-status', {
+    retryLimit:      3,
+    retryBackoff:    true,
+    expireInSeconds: 60,
+  });
 
   await boss.work('publish-post', handlePublishPost);
   await boss.work('tiktok-check-status', handleTikTokCheckStatus);
+  await boss.work('instagram-check-status', handleInstagramCheckStatus);
 }

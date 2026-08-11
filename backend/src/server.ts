@@ -48,7 +48,7 @@ async function start() {
   try {
     const boss = await getBoss();
     await registerPublishPostWorker(boss);
-    logger.info('[PublishQueue] Worker registrado (publish-post, tiktok-check-status)');
+    logger.info('[PublishQueue] Worker registrado (publish-post, tiktok-check-status, instagram-check-status)');
   } catch (err) {
     logger.error('[PublishQueue] No se pudo iniciar pg-boss — la publicación automática quedará sin procesar:', (err as Error).message);
   }

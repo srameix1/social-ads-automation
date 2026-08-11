@@ -11,6 +11,7 @@ export interface Publication {
   status:            string;
   post_id:           string | null;
   post_url:          string | null;
+  container_id:      string | null;
   error_message:     string | null;
   published_at:      string | null;
   created_at:        string;
