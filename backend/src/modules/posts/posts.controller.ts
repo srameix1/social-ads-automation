@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as postsService from './posts.service';
+import { validateTextField } from '../../utils/validation';
 
 // ── Campaign-level handlers ────────────────────────────────────────────────
 
@@ -44,10 +45,28 @@ export async function getPost(req: Request, res: Response, next: NextFunction): 
 
 export async function updateDescription(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const {
+      post_focus, problem, differentiator, ideal_client, concrete_result, client_pain,
+    } = req.body as {
+      post_focus?:      unknown;
+      problem?:         unknown;
+      differentiator?:  unknown;
+      ideal_client?:    unknown;
+      concrete_result?: unknown;
+      client_pain?:     unknown;
+    };
+
     const post = await postsService.updateDescription(
       req.params.postId,
       req.user!.userId,
-      req.body,
+      {
+        post_focus:      validateTextField(post_focus, 'post_focus'),
+        problem:         validateTextField(problem, 'problem'),
+        differentiator:  validateTextField(differentiator, 'differentiator'),
+        ideal_client:    validateTextField(ideal_client, 'ideal_client'),
+        concrete_result: validateTextField(concrete_result, 'concrete_result'),
+        client_pain:     validateTextField(client_pain, 'client_pain'),
+      },
     );
     res.json({ post });
   } catch (err) { next(err); }

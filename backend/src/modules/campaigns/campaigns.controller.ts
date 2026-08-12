@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as campaignsService from './campaigns.service';
+import { validateTextField } from '../../utils/validation';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -19,16 +20,20 @@ export async function create(req: Request, res: Response, next: NextFunction): P
   try {
     const {
       title, platforms, month_year,
-      business_problem, differentiator, ideal_client, concrete_result, client_pain,
+      business_problem: rawBusinessProblem,
+      differentiator:   rawDifferentiator,
+      ideal_client:     rawIdealClient,
+      concrete_result:  rawConcreteResult,
+      client_pain:      rawClientPain,
     } = req.body as {
       title:             string;
       platforms:         string[];
       month_year?:       string;
-      business_problem?: string;
-      differentiator?:   string;
-      ideal_client?:     string;
-      concrete_result?:  string;
-      client_pain?:      string;
+      business_problem?: unknown;
+      differentiator?:   unknown;
+      ideal_client?:     unknown;
+      concrete_result?:  unknown;
+      client_pain?:      unknown;
     };
 
     if (!title) { res.status(400).json({ error: 'Título requerido' }); return; }
@@ -36,11 +41,17 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       res.status(400).json({ error: 'Selecciona al menos una plataforma' }); return;
     }
 
+    const businessProblem = validateTextField(rawBusinessProblem, 'business_problem');
+    const differentiator  = validateTextField(rawDifferentiator, 'differentiator');
+    const idealClient     = validateTextField(rawIdealClient, 'ideal_client');
+    const concreteResult  = validateTextField(rawConcreteResult, 'concrete_result');
+    const clientPain      = validateTextField(rawClientPain, 'client_pain');
+
     const monthYear = month_year || new Date().toISOString().slice(0, 7);
 
     const campaign = await campaignsService.createCampaign(
       req.user!.userId, title, platforms, monthYear,
-      { businessProblem: business_problem, differentiator, idealClient: ideal_client, concreteResult: concrete_result, clientPain: client_pain },
+      { businessProblem, differentiator, idealClient, concreteResult, clientPain },
     );
     res.status(201).json({ campaign });
   } catch (err) { next(err); }
