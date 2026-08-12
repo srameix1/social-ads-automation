@@ -21,11 +21,11 @@ export interface PublishResult {
   postUrl: string;
 }
 
-// No tiene más callers desde este archivo — la espera bloqueante de 5 min se
-// reemplazó por polling asíncrono vía pg-boss (ver instagram-check-status en
-// publishPost.job.ts), igual que ya existía para TikTok. Se deja sin borrar
-// por si hace falta como referencia; mismo criterio que otras funciones
-// huérfanas del proyecto.
+// Ya no la llama el flujo de video por cola (publishPost.job.ts) — ese
+// reemplazó la espera bloqueante de 5 min por polling asíncrono vía pg-boss
+// (ver instagram-check-status), igual que ya existía para TikTok. Sigue
+// usándola publishToInstagram, el wrapper síncrono para el caller legacy de
+// variations.service.ts.
 async function waitForContainerReady(
   baseUrl:      string,
   creationId:   string,
