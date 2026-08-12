@@ -15,15 +15,12 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-
   console.log(`[API] ${options.method ?? 'GET'} ${API_URL}${path}`);
 
   const res = await fetch(`${API_URL}${path}`, {
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers ?? {}),
     },
     ...options,
@@ -48,8 +45,6 @@ async function request<T>(
         window.location.pathname.startsWith(p),
       );
       if (!onPublicPage) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
         fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' })
           .finally(() => { window.location.href = '/login'; });
       }
@@ -106,7 +101,6 @@ export const clients = {
     fetch(`${API_URL}/clients/profile/photos`, {
       method: 'POST',
       credentials: 'include',
-      headers: { Authorization: `Bearer ${localStorage.getItem('auth_token') ?? ''}` },
       body: formData,
     }).then(r => r.json()),
   selectPlan: (plan: import('./types').ServicePlan) =>
@@ -136,7 +130,6 @@ export const clients = {
     fetch(`${API_URL}/clients/profile/brand/logo`, {
       method: 'POST',
       credentials: 'include',
-      headers: { Authorization: `Bearer ${localStorage.getItem('auth_token') ?? ''}` },
       body: formData,
     }).then(r => r.json()),
 };
@@ -222,11 +215,9 @@ export const posts = {
     const form = new FormData();
     form.append('strategy_id', strategyId);
     photos.forEach(f => form.append('photos', f));
-    const token = typeof window !== 'undefined' ? (localStorage.getItem('auth_token') ?? '') : '';
     return fetch(`${API_URL}/posts/${postId}/select-copy-with-photos`, {
       method:      'POST',
       credentials: 'include',
-      headers:     { Authorization: `Bearer ${token}` },
       body:        form,
     }).then(async r => {
       const body = await r.json() as { error?: string; post?: import('./types').Post };

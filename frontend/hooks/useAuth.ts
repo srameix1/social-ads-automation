@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getStoredUser, clearAuth } from '@/lib/auth';
+import { clearAuth } from '@/lib/auth';
 import { auth } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 
@@ -17,16 +17,13 @@ export function useAuth() {
   const router = useRouter();
 
   useEffect(() => {
-    const stored = getStoredUser();
-    if (stored) {
-      setUser(stored);
-      setLoading(false);
-    } else {
-      auth.me()
-        .then(data => setUser(data.user))
-        .catch(() => setUser(null))
-        .finally(() => setLoading(false));
-    }
+    // Always ask the backend — it validates the httpOnly session cookie
+    // server-side. No client-cached shortcut: a locally-forged or stale
+    // cached identity should never substitute for a real check.
+    auth.me()
+      .then(data => setUser(data.user))
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
   }, []);
 
   const logout = async () => {
