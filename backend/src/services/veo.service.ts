@@ -87,7 +87,7 @@ export async function generateVideo(input: VideoGenerationInput): Promise<VideoG
   const prompt = buildVideoPrompt(input, enhancedScene);
   logger.info(`[Veo] Iniciando generación de video ${input.aspectRatio} para "${input.businessName}"`);
   logger.info(`[Veo] Endpoint: ${VEO_ENDPOINT}`);
-  logger.info(`[Veo] API key: ${apiKey.slice(0, 10)}… (longitud: ${apiKey.length})`);
+  logger.info(`[Veo] API key presente: ${!!apiKey}`);
   logger.info(`[Veo] Prompt completo:\n${prompt}`);
 
   try {
