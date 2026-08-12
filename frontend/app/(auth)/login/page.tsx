@@ -29,6 +29,11 @@ export default function LoginPage() {
       const data = await auth.login(email, password);
       saveAuth(data.token, data.user);
       router.push(redirectByRole(data.user.role));
+      // Don't rely on the navigation unmounting this component to end the
+      // loading state -- if the redirect ever silently fails to land (e.g.
+      // a routing/cookie-domain regression like the one this fix addresses),
+      // the button must not spin forever with no visible error.
+      setLoading(false);
     } catch (err) {
       const apiErr = err as ApiError;
       if (apiErr.code === 'EMAIL_UNVERIFIED') setShowResend(true);

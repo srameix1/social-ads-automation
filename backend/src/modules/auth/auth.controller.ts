@@ -7,6 +7,12 @@ const COOKIE_OPTIONS = {
   secure:   env.NODE_ENV === 'production',
   sameSite: 'lax' as const,
   maxAge:   7 * 24 * 60 * 60 * 1000, // 7 días
+  // Leading dot makes the cookie valid on spotflow.pro AND api.spotflow.pro
+  // (frontend and backend are on different subdomains) — without this,
+  // middleware.ts on the frontend can never see the session cookie, since a
+  // cookie with no explicit domain is scoped only to the host that set it.
+  // undefined in dev: localhost has no real domain to scope a dot-cookie to.
+  domain: env.NODE_ENV === 'production' ? '.spotflow.pro' : undefined,
 };
 
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -84,8 +90,13 @@ export async function resendVerification(req: Request, res: Response, next: Next
 }
 
 export function logout(_req: Request, res: Response): void {
-  res.clearCookie('auth_token');
-  res.clearCookie('user_role');
+  // clearCookie must be called with the same `domain` used to set the
+  // cookie, or the browser won't match it — it would just set a new,
+  // already-expired cookie on the default (no-domain) scope, leaving the
+  // real .spotflow.pro-scoped cookie orphaned and still valid until it
+  // naturally expires.
+  res.clearCookie('auth_token', { domain: COOKIE_OPTIONS.domain });
+  res.clearCookie('user_role',  { domain: COOKIE_OPTIONS.domain });
   res.json({ message: 'Sesión cerrada' });
 }
 
