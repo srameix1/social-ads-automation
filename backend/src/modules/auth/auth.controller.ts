@@ -52,7 +52,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       return;
     }
 
-    const result = await authService.login(email, password);
+    const result = await authService.login(email, password, req.ip!);
     setAuthCookies(res, result.token, result.user);
     res.json({ user: result.user, token: result.token });
   } catch (err) {

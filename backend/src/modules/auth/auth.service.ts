@@ -27,6 +27,49 @@ const resendRateLimiter = new Map<string, { count: number; windowStart: number }
 const RESEND_LIMIT      = 3;
 const RESEND_WINDOW_MS  = 15 * 60 * 1000;
 
+// In-memory rate limiter for login: max 5 failed attempts per (IP, email) pair
+// per 15 min — brute-force protection. Keyed on IP+email together (not IP alone)
+// so one attacker guessing against one email can't lock out everyone else behind
+// the same NAT/office IP. Only failed attempts (wrong email or wrong password)
+// increment the counter; a successful password match clears it immediately.
+//
+// LIMITATION: this is process-local memory, same pattern as resendRateLimiter
+// above — it resets on every backend restart/redeploy, and would NOT be shared
+// across instances if this service is ever horizontally scaled (a distributed
+// attacker or multiple backend instances behind a load balancer would each get
+// their own independent counter). Fine for the current single-instance
+// deployment; revisit with Redis (or a DB-backed table) if that changes.
+const loginRateLimiter = new Map<string, { count: number; windowStart: number }>();
+const LOGIN_ATTEMPT_LIMIT = 5;
+const LOGIN_WINDOW_MS     = 15 * 60 * 1000;
+
+function loginRateLimitKey(ip: string, email: string): string {
+  return `${ip}:${email.toLowerCase()}`;
+}
+
+function isLoginRateLimited(ip: string, email: string): boolean {
+  const entry = loginRateLimiter.get(loginRateLimitKey(ip, email));
+  if (!entry) return false;
+  if (Date.now() - entry.windowStart >= LOGIN_WINDOW_MS) return false;
+  return entry.count >= LOGIN_ATTEMPT_LIMIT;
+}
+
+function registerFailedLogin(ip: string, email: string): void {
+  const key   = loginRateLimitKey(ip, email);
+  const now   = Date.now();
+  const entry = loginRateLimiter.get(key);
+
+  if (entry && now - entry.windowStart < LOGIN_WINDOW_MS) {
+    entry.count++;
+  } else {
+    loginRateLimiter.set(key, { count: 1, windowStart: now });
+  }
+}
+
+function clearLoginRateLimit(ip: string, email: string): void {
+  loginRateLimiter.delete(loginRateLimitKey(ip, email));
+}
+
 export async function register(
   email:          string,
   password:       string,
@@ -101,17 +144,35 @@ export async function verifyEmail(token: string): Promise<LoginResult> {
   return { token: jwtToken, user };
 }
 
-export async function login(email: string, password: string): Promise<LoginResult> {
+export async function login(email: string, password: string, ip: string): Promise<LoginResult> {
+  // Checked first, before touching the DB — same generic message as a wrong
+  // password below, so a client can't tell "you're rate-limited" apart from
+  // "wrong credentials" from the response alone.
+  if (isLoginRateLimited(ip, email)) {
+    throw createError('Credenciales incorrectas', 401);
+  }
+
   const row = await queryOne<AuthUser & { password_hash: string }>(
     'SELECT id, email, role, is_active, email_verified, created_at, password_hash FROM users WHERE email = $1',
     [email],
   );
 
-  if (!row) throw createError('Credenciales incorrectas', 401);
+  if (!row) {
+    registerFailedLogin(ip, email);
+    throw createError('Credenciales incorrectas', 401);
+  }
   if (!row.is_active) throw createError('Cuenta desactivada', 403);
 
   const valid = await bcrypt.compare(password, row.password_hash);
-  if (!valid) throw createError('Credenciales incorrectas', 401);
+  if (!valid) {
+    registerFailedLogin(ip, email);
+    throw createError('Credenciales incorrectas', 401);
+  }
+
+  // Correct password from here on — not a brute-force guess anymore, so clear
+  // any prior failed attempts for this pair even if the login is about to be
+  // blocked below for an unrelated reason (unverified email).
+  clearLoginRateLimit(ip, email);
 
   if (!row.email_verified) {
     throw createError('Por favor verifica tu email antes de iniciar sesión', 403, 'EMAIL_UNVERIFIED');
