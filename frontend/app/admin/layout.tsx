@@ -10,6 +10,7 @@ const NAV = [
   { href: '/admin/clients',      label: 'Clientes'                    },
   { href: '/admin/campaigns',    label: 'Campañas'                    },
   { href: '/admin/plan-limits',  label: 'Límites de planes'           },
+  { href: '/admin/settings',     label: 'Configuración'               },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
