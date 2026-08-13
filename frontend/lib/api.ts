@@ -80,9 +80,19 @@ export const auth = {
     request<{ token: string; user: { id: string; email: string; role: string } }>(
       `/auth/verify-email?token=${encodeURIComponent(token)}`,
     ),
+  // Admins with 2FA active get { requires_2fa: true, pendingToken } instead
+  // of a session — the caller has to redirect to /verify-2fa and complete it
+  // via auth.verifyLogin2FA before there's an actual logged-in session.
   login: (email: string, password: string) =>
-    request<{ token: string; user: { id: string; email: string; role: string } }>(
+    request<
+      | { token: string; user: { id: string; email: string; role: string } }
+      | { requires_2fa: true; pendingToken: string }
+    >(
       '/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) },
+    ),
+  verifyLogin2FA: (pendingToken: string, code: string) =>
+    request<{ token: string; user: { id: string; email: string; role: string } }>(
+      '/auth/login/verify-2fa', { method: 'POST', body: JSON.stringify({ pendingToken, code }) },
     ),
   resendVerification: (email: string) =>
     request<{ message: string }>(
@@ -90,6 +100,20 @@ export const auth = {
     ),
   logout: () => request('/auth/logout', { method: 'POST' }),
   me:     () => request<{ user: { id: string; email: string; role: string } }>('/auth/me'),
+};
+
+// ── 2FA (TOTP) — admin only ──────────────────────────────────────────────────
+export const twoFactor = {
+  setup: () =>
+    request<{ secret: string; otpauthUrl: string }>('/auth/2fa/setup', { method: 'POST' }),
+  verifySetup: (code: string) =>
+    request<{ backupCodes: string[] }>('/auth/2fa/verify-setup', {
+      method: 'POST', body: JSON.stringify({ code }),
+    }),
+  disable: (password: string, code: string) =>
+    request<{ message: string }>('/auth/2fa/disable', {
+      method: 'POST', body: JSON.stringify({ password, code }),
+    }),
 };
 
 // ── Client Profile ─────────────────────────────────────────────────────────

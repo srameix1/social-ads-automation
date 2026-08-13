@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Auth pages: redirect logged-in users to their dashboard
-const AUTH_PATHS = ['/login', '/register', '/verify-email'];
+const AUTH_PATHS = ['/login', '/register', '/verify-email', '/verify-2fa'];
 // Legal pages: always accessible regardless of auth state
 const PUBLIC_PATHS = ['/privacy', '/terms'];
 // Require auth but are exempt from the onboarding redirect check in (client)/layout.tsx

@@ -27,6 +27,19 @@ export default function LoginPage() {
     setLoading(true); setError(''); setShowResend(false); setResendSent(false);
     try {
       const data = await auth.login(email, password);
+
+      if ('requires_2fa' in data) {
+        // No session yet — the pendingToken only unlocks POST
+        // /auth/login/verify-2fa, nothing else (see authenticate.ts on the
+        // backend, which rejects it outright everywhere else). Passed as a
+        // query param, same pattern already used for the Facebook OAuth
+        // token handoff (connect/facebook/pages) — it expires in 5 minutes
+        // and isn't the real session, so it's fine in the URL.
+        router.push(`/verify-2fa?pendingToken=${encodeURIComponent(data.pendingToken)}`);
+        setLoading(false);
+        return;
+      }
+
       saveAuth(data.token, data.user);
       router.push(redirectByRole(data.user.role));
       // Don't rely on the navigation unmounting this component to end the

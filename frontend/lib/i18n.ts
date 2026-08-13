@@ -155,6 +155,15 @@ const es: Dict = {
   login_feature3:   'Publica en Instagram, Facebook y TikTok',
   login_copyright:  '© 2025 SpotFlow by RAMEIX I LLC',
 
+  // 2FA verification (login)
+  verify2fa_title:            'Verificación en dos pasos',
+  verify2fa_subtitle:         'Ingresá el código de tu app de autenticación, o un código de respaldo.',
+  verify2fa_code_label:       'Código',
+  verify2fa_code_placeholder: '123456 o código de respaldo',
+  verify2fa_submit:           'Verificar',
+  verify2fa_missing_token:    'No encontramos tu sesión de verificación. Iniciá sesión de nuevo.',
+  verify2fa_back_to_login:    'Volver a iniciar sesión',
+
   // Register
   register_title:             'Crear cuenta',
   register_subtitle:          'Empieza gratis, cancela cuando quieras',
@@ -675,6 +684,15 @@ const en: Dict = {
   login_feature3:   'Publish to Instagram, Facebook and TikTok',
   login_copyright:  '© 2025 SpotFlow by RAMEIX I LLC',
 
+  // 2FA verification (login)
+  verify2fa_title:            'Two-factor verification',
+  verify2fa_subtitle:         'Enter the code from your authenticator app, or a backup code.',
+  verify2fa_code_label:       'Code',
+  verify2fa_code_placeholder: '123456 or backup code',
+  verify2fa_submit:           'Verify',
+  verify2fa_missing_token:    "We couldn't find your verification session. Sign in again.",
+  verify2fa_back_to_login:    'Back to sign in',
+
   // Register
   register_title:             'Create account',
   register_subtitle:          'Start free, cancel anytime',
@@ -1194,6 +1212,15 @@ const pt: Dict = {
   login_feature2:   'Imagens e vídeos gerados por IA',
   login_feature3:   'Publique no Instagram, Facebook e TikTok',
   login_copyright:  '© 2025 SpotFlow by RAMEIX I LLC',
+
+  // 2FA verification (login)
+  verify2fa_title:            'Verificação em duas etapas',
+  verify2fa_subtitle:         'Informe o código do seu app autenticador, ou um código de backup.',
+  verify2fa_code_label:       'Código',
+  verify2fa_code_placeholder: '123456 ou código de backup',
+  verify2fa_submit:           'Verificar',
+  verify2fa_missing_token:    'Não encontramos sua sessão de verificação. Entre novamente.',
+  verify2fa_back_to_login:    'Voltar ao login',
 
   // Register
   register_title:             'Criar conta',
