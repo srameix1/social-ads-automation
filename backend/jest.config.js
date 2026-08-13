@@ -11,4 +11,14 @@ module.exports = {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.test.json' }],
   },
   clearMocks: true,
+  // Todos los archivos de test comparten UNA sola base Postgres real
+  // (social_ads_db_test) y cada uno hace truncateAllTables() en su propio
+  // beforeEach. Con más de 1 worker, Jest corre archivos en paralelo en
+  // procesos distintos — el truncate de un archivo puede borrar filas que
+  // otro archivo acaba de insertar a mitad de un test, dando FK violations
+  // o logins que fallan por "usuario no encontrado" de forma intermitente.
+  // maxWorkers:1 serializa la ejecución de archivos para eliminar la
+  // condición de carrera. Si esto se vuelve un cuello de botella real,
+  // la alternativa es aislar por schema/DB por worker, no volver a paralelizar.
+  maxWorkers: 1,
 };
