@@ -99,7 +99,8 @@ export const auth = {
       '/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) },
     ),
   logout: () => request('/auth/logout', { method: 'POST' }),
-  me:     () => request<{ user: { id: string; email: string; role: string } }>('/auth/me'),
+  me:     () =>
+    request<{ user: { id: string; email: string; role: string; totp_enabled: boolean } }>('/auth/me'),
 };
 
 // ── 2FA (TOTP) — admin only ──────────────────────────────────────────────────

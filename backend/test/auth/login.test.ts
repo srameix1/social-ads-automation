@@ -160,8 +160,9 @@ describe('GET /api/auth/me', () => {
 
     expect(meRes.status).toBe(200);
     expect(meRes.body.user).toMatchObject({
-      email: 'me-flow@test.local',
-      role:  'client',
+      email:        'me-flow@test.local',
+      role:         'client',
+      totp_enabled: false, // default para una cuenta sin 2FA
     });
   });
 });

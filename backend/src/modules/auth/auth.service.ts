@@ -17,6 +17,7 @@ export interface AuthUser {
   is_active:      boolean;
   email_verified: boolean;
   created_at:     string;
+  totp_enabled:   boolean;
 }
 
 export interface LoginResult {
@@ -229,7 +230,7 @@ export async function register(
   const [user] = await query<AuthUser>(
     `INSERT INTO users (email, password_hash, role, email_verified, verification_token, verification_token_expires_at)
      VALUES ($1, $2, 'client', FALSE, $3, $4)
-     RETURNING id, email, role, is_active, email_verified, created_at`,
+     RETURNING id, email, role, is_active, email_verified, created_at, totp_enabled`,
     [email, passwordHash, verificationToken, expiresAt],
   );
 
@@ -252,7 +253,7 @@ export async function register(
 
 export async function verifyEmail(token: string): Promise<LoginResult> {
   const row = await queryOne<AuthUser & { verification_token_expires_at: string }>(
-    `SELECT id, email, role, is_active, email_verified, created_at, verification_token_expires_at
+    `SELECT id, email, role, is_active, email_verified, created_at, totp_enabled, verification_token_expires_at
      FROM users
      WHERE verification_token = $1`,
     [token],
@@ -269,7 +270,7 @@ export async function verifyEmail(token: string): Promise<LoginResult> {
     `UPDATE users
      SET email_verified = TRUE, verification_token = NULL, verification_token_expires_at = NULL
      WHERE id = $1
-     RETURNING id, email, role, is_active, email_verified, created_at`,
+     RETURNING id, email, role, is_active, email_verified, created_at, totp_enabled`,
     [row.id],
   );
 
@@ -285,8 +286,8 @@ export async function login(email: string, password: string, ip: string): Promis
     throw createError('Credenciales incorrectas', 401);
   }
 
-  const row = await queryOne<AuthUser & { password_hash: string; totp_enabled: boolean }>(
-    'SELECT id, email, role, is_active, email_verified, created_at, password_hash, totp_enabled FROM users WHERE email = $1',
+  const row = await queryOne<AuthUser & { password_hash: string }>(
+    'SELECT id, email, role, is_active, email_verified, created_at, totp_enabled, password_hash FROM users WHERE email = $1',
     [email],
   );
 
@@ -321,7 +322,7 @@ export async function login(email: string, password: string, ip: string): Promis
     return { requiresTwoFactor: true, pendingToken };
   }
 
-  const { password_hash: _, totp_enabled: __, ...user } = row;
+  const { password_hash: _, ...user } = row;
   const jwtToken = signToken(user);
   return { token: jwtToken, user };
 }
@@ -347,7 +348,7 @@ export async function verifyLoginTwoFactor(
   const row = await queryOne<
     AuthUser & { totp_secret: string | null; totp_backup_codes: string[] | null }
   >(
-    `SELECT id, email, role, is_active, email_verified, created_at, totp_secret, totp_backup_codes
+    `SELECT id, email, role, is_active, email_verified, created_at, totp_enabled, totp_secret, totp_backup_codes
      FROM users WHERE id = $1`,
     [payload.userId],
   );
@@ -491,7 +492,7 @@ function generateBackupCodes(count: number): string[] {
 
 export async function getMe(userId: string): Promise<AuthUser> {
   const user = await queryOne<AuthUser>(
-    'SELECT id, email, role, is_active, email_verified, created_at FROM users WHERE id = $1',
+    'SELECT id, email, role, is_active, email_verified, created_at, totp_enabled FROM users WHERE id = $1',
     [userId],
   );
   if (!user) throw createError('Usuario no encontrado', 404);
