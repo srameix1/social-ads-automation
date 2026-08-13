@@ -5,6 +5,16 @@ if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: path.join(__dirname, '../../../.env') });
 }
 
+// Overrides exclusivos de test (TEST_DATABASE_URL, etc.) — se cargan
+// DESPUÉS del .env normal y con override:true para poder pisar DB_NAME
+// u otras claves si hiciera falta. Nunca se cargan fuera de NODE_ENV=test.
+if (process.env.NODE_ENV === 'test') {
+  dotenv.config({
+    path: path.join(__dirname, '../../.env.test.local'),
+    override: true,
+  });
+}
+
 function required(name: string): string {
   const val = process.env[name];
   if (!val) throw new Error(`Variable de entorno requerida no encontrada: ${name}`);
@@ -33,6 +43,7 @@ export const env = {
   ENCRYPTION_KEY: required('ENCRYPTION_KEY'),
 
   DATABASE_URL: optional('DATABASE_URL', ''),
+  TEST_DATABASE_URL: optional('TEST_DATABASE_URL', ''),
 
   ANTHROPIC_API_KEY: optional('ANTHROPIC_API_KEY', ''),
   SERPER_API_KEY:    optional('SERPER_API_KEY',    ''),
