@@ -32,6 +32,16 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     return;
   }
 
+  // El pendingToken que login() emite para admins con 2FA activo se firma
+  // con el MISMO JWT_SECRET (para no manejar dos secretos), pero sólo sirve
+  // para POST /api/auth/login/verify-2fa — nunca debe pasar como sesión acá,
+  // o alguien con ese token (sin haber completado 2FA) tendría acceso
+  // completo a la API.
+  if ((payload as unknown as Record<string, unknown>).pending2FA === true) {
+    res.status(401).json({ error: 'Verificación de dos factores pendiente' });
+    return;
+  }
+
   // Verify the user still exists in the database.
   // A valid JWT for a deleted/non-existent user would otherwise cause FK violations downstream.
   try {

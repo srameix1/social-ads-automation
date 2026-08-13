@@ -59,6 +59,30 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     }
 
     const result = await authService.login(email, password, req.ip!);
+
+    if ('requiresTwoFactor' in result) {
+      // Todavía no hay sesión — nada de cookies acá. El cliente tiene que
+      // completar POST /api/auth/login/verify-2fa con este pendingToken.
+      res.json({ requires_2fa: true, pendingToken: result.pendingToken });
+      return;
+    }
+
+    setAuthCookies(res, result.token, result.user);
+    res.json({ user: result.user, token: result.token });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function verifyLoginTwoFactor(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { pendingToken, code } = req.body as { pendingToken?: unknown; code?: unknown };
+    if (!pendingToken || typeof pendingToken !== 'string' || !code || typeof code !== 'string') {
+      res.status(400).json({ error: 'pendingToken y code son requeridos' });
+      return;
+    }
+
+    const result = await authService.verifyLoginTwoFactor(pendingToken, code, req.ip!);
     setAuthCookies(res, result.token, result.user);
     res.json({ user: result.user, token: result.token });
   } catch (err) {
@@ -93,6 +117,21 @@ export async function verifyTotpSetup(req: Request, res: Response, next: NextFun
     }
 
     const result = await authService.verifyTotpSetup(req.user!.userId, code);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function disableTotp(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { password, code } = req.body as { password?: unknown; code?: unknown };
+    if (!password || typeof password !== 'string' || !code || typeof code !== 'string') {
+      res.status(400).json({ error: 'password y code son requeridos' });
+      return;
+    }
+
+    const result = await authService.disableTotp(req.user!.userId, password, code);
     res.json(result);
   } catch (err) {
     next(err);

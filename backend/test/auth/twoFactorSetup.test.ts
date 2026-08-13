@@ -92,8 +92,11 @@ describe('POST /api/auth/2fa/setup', () => {
 
   it('si 2FA ya está activo, rechaza con 409 en vez de rotar el secreto en silencio', async () => {
     const admin = await createUser({ email: 'admin-already@test.local', password: 'AdminPass123!', role: 'admin' });
-    await query('UPDATE users SET totp_enabled = TRUE, totp_secret = $1 WHERE id = $2', ['SOMEEXISTINGSECRET', admin.id]);
+    // Login ANTES de forzar totp_enabled=TRUE: una vez activo, login() exige
+    // el segundo factor (ver test/auth/twoFactorLogin.test.ts) — acá sólo
+    // nos interesa la sesión ya establecida, no ese flujo.
     const cookie = await loginAndGetCookie('admin-already@test.local', 'AdminPass123!');
+    await query('UPDATE users SET totp_enabled = TRUE, totp_secret = $1 WHERE id = $2', ['SOMEEXISTINGSECRET', admin.id]);
 
     const res = await request(app).post('/api/auth/2fa/setup').set('Cookie', cookie);
 

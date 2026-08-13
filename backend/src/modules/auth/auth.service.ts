@@ -24,6 +24,16 @@ export interface LoginResult {
   user:  AuthUser;
 }
 
+// Devuelto por login() en vez de LoginResult cuando la cuenta es admin y
+// tiene 2FA activo — todavía no hay sesión, sólo un token temporal que sólo
+// sirve para POST /api/auth/login/verify-2fa.
+export interface TwoFactorRequiredResult {
+  requiresTwoFactor: true;
+  pendingToken:      string;
+}
+
+export type LoginOutcome = LoginResult | TwoFactorRequiredResult;
+
 // In-memory rate limiter for resend-verification: max 3 per email per 15 min
 const resendRateLimiter = new Map<string, { count: number; windowStart: number }>();
 const RESEND_LIMIT      = 3;
@@ -96,6 +106,101 @@ function deserializeEncryptedSecret(stored: string): { encrypted: string; iv: st
 export interface TotpSetupResult {
   secret:     string;
   otpauthUrl: string;
+}
+
+const PENDING_2FA_EXPIRES_IN = '5m';
+
+interface PendingTwoFactorPayload {
+  userId:     string;
+  pending2FA: true;
+}
+
+function signPendingTwoFactorToken(userId: string): string {
+  return jwt.sign(
+    { userId, pending2FA: true },
+    env.JWT_SECRET,
+    { expiresIn: PENDING_2FA_EXPIRES_IN },
+  );
+}
+
+/** Lanza 401 si el token no es válido, venció, o no es específicamente un pending-2FA token. */
+function verifyPendingTwoFactorToken(token: string): PendingTwoFactorPayload {
+  let payload: unknown;
+  try {
+    payload = jwt.verify(token, env.JWT_SECRET);
+  } catch {
+    throw createError('Token de verificación vencido o inválido. Iniciá sesión de nuevo.', 401, 'PENDING_TOKEN_INVALID');
+  }
+
+  if (
+    !payload || typeof payload !== 'object' ||
+    (payload as Record<string, unknown>).pending2FA !== true ||
+    typeof (payload as Record<string, unknown>).userId !== 'string'
+  ) {
+    throw createError('Token de verificación inválido', 401, 'PENDING_TOKEN_INVALID');
+  }
+
+  return payload as PendingTwoFactorPayload;
+}
+
+// Rate limiter para POST /login/verify-2fa — mismo patrón que
+// loginRateLimiter (5 intentos fallidos / 15 min), pero keyeado por
+// (IP, userId) en vez de (IP, email): el pendingToken cambia en cada login,
+// así que no sirve como key; el userId que lleva adentro sí es estable.
+const twoFactorRateLimiter    = new Map<string, { count: number; windowStart: number }>();
+const TWO_FACTOR_ATTEMPT_LIMIT = 5;
+const TWO_FACTOR_WINDOW_MS     = 15 * 60 * 1000;
+
+function twoFactorRateLimitKey(ip: string, userId: string): string {
+  return `${ip}:${userId}`;
+}
+
+function isTwoFactorRateLimited(ip: string, userId: string): boolean {
+  const entry = twoFactorRateLimiter.get(twoFactorRateLimitKey(ip, userId));
+  if (!entry) return false;
+  if (Date.now() - entry.windowStart >= TWO_FACTOR_WINDOW_MS) return false;
+  return entry.count >= TWO_FACTOR_ATTEMPT_LIMIT;
+}
+
+function registerTwoFactorFailure(ip: string, userId: string): void {
+  const key   = twoFactorRateLimitKey(ip, userId);
+  const now   = Date.now();
+  const entry = twoFactorRateLimiter.get(key);
+
+  if (entry && now - entry.windowStart < TWO_FACTOR_WINDOW_MS) {
+    entry.count++;
+  } else {
+    twoFactorRateLimiter.set(key, { count: 1, windowStart: now });
+  }
+}
+
+function clearTwoFactorRateLimit(ip: string, userId: string): void {
+  twoFactorRateLimiter.delete(twoFactorRateLimitKey(ip, userId));
+}
+
+/** Busca `code` entre los hashes de backup codes; devuelve el hash que matcheó, o null. */
+async function findMatchingBackupCode(code: string, hashes: string[]): Promise<string | null> {
+  for (const hash of hashes) {
+    if (await bcrypt.compare(code, hash)) return hash;
+  }
+  return null;
+}
+
+/**
+ * otplib.verify() LANZA (no devuelve { valid: false }) si `token` no tiene
+ * el formato esperado — ej. un backup code (21 caracteres) contra un
+ * validador que exige 6 dígitos. Acá se trata cualquier input malformado
+ * como "código inválido" en vez de dejar que reviente como 500, así los
+ * call-sites pueden probar un código TOTP y, si falla, caer al chequeo de
+ * backup codes sin volarse por un formato inesperado.
+ */
+async function isValidTotpCode(secret: string, code: string): Promise<boolean> {
+  try {
+    const result = await verifyTotpCode({ secret, token: code });
+    return result.valid;
+  } catch {
+    return false;
+  }
 }
 
 export async function register(
@@ -172,7 +277,7 @@ export async function verifyEmail(token: string): Promise<LoginResult> {
   return { token: jwtToken, user };
 }
 
-export async function login(email: string, password: string, ip: string): Promise<LoginResult> {
+export async function login(email: string, password: string, ip: string): Promise<LoginOutcome> {
   // Checked first, before touching the DB — same generic message as a wrong
   // password below, so a client can't tell "you're rate-limited" apart from
   // "wrong credentials" from the response alone.
@@ -180,8 +285,8 @@ export async function login(email: string, password: string, ip: string): Promis
     throw createError('Credenciales incorrectas', 401);
   }
 
-  const row = await queryOne<AuthUser & { password_hash: string }>(
-    'SELECT id, email, role, is_active, email_verified, created_at, password_hash FROM users WHERE email = $1',
+  const row = await queryOne<AuthUser & { password_hash: string; totp_enabled: boolean }>(
+    'SELECT id, email, role, is_active, email_verified, created_at, password_hash, totp_enabled FROM users WHERE email = $1',
     [email],
   );
 
@@ -206,9 +311,113 @@ export async function login(email: string, password: string, ip: string): Promis
     throw createError('Por favor verifica tu email antes de iniciar sesión', 403, 'EMAIL_UNVERIFIED');
   }
 
-  const { password_hash: _, ...user } = row;
+  // 2FA es exclusivo de cuentas admin — un cliente jamás puede tener
+  // totp_enabled=true (sólo /2fa/setup + /2fa/verify-setup lo activan, y
+  // ambos están gateados con authorize('admin')), así que este chequeo de
+  // role es en la práctica redundante hoy, pero es la barrera explícita que
+  // asegura que un futuro bug en el setup no filtre 2FA al flujo de clientes.
+  if (row.role === 'admin' && row.totp_enabled) {
+    const pendingToken = signPendingTwoFactorToken(row.id);
+    return { requiresTwoFactor: true, pendingToken };
+  }
+
+  const { password_hash: _, totp_enabled: __, ...user } = row;
   const jwtToken = signToken(user);
   return { token: jwtToken, user };
+}
+
+/**
+ * Segundo paso del login para admins con 2FA: recibe el pendingToken emitido
+ * por login() + un código (TOTP de 6 dígitos o un backup code sin usar). Si
+ * matchea, recién ahí firma el JWT de sesión real — idéntico al login normal.
+ */
+export async function verifyLoginTwoFactor(
+  pendingToken: string,
+  code:         string,
+  ip:           string,
+): Promise<LoginResult> {
+  const payload = verifyPendingTwoFactorToken(pendingToken);
+
+  // Mismo criterio que el rate limiter de login: mensaje genérico, chequeo
+  // antes de tocar la DB, para no filtrar "estás bloqueado" vs "código malo".
+  if (isTwoFactorRateLimited(ip, payload.userId)) {
+    throw createError('Código inválido', 401);
+  }
+
+  const row = await queryOne<
+    AuthUser & { totp_secret: string | null; totp_backup_codes: string[] | null }
+  >(
+    `SELECT id, email, role, is_active, email_verified, created_at, totp_secret, totp_backup_codes
+     FROM users WHERE id = $1`,
+    [payload.userId],
+  );
+
+  if (!row || !row.is_active || !row.totp_secret) {
+    registerTwoFactorFailure(ip, payload.userId);
+    throw createError('Código inválido', 401);
+  }
+
+  const plainSecret = decryptSecret(deserializeEncryptedSecret(row.totp_secret));
+  const totpValid    = await isValidTotpCode(plainSecret, code);
+
+  let usedBackupCodeHash: string | null = null;
+  if (!totpValid) {
+    usedBackupCodeHash = await findMatchingBackupCode(code, row.totp_backup_codes ?? []);
+    if (!usedBackupCodeHash) {
+      registerTwoFactorFailure(ip, payload.userId);
+      throw createError('Código inválido', 401);
+    }
+  }
+
+  clearTwoFactorRateLimit(ip, payload.userId);
+
+  // Backup code de un solo uso: se saca de la lista apenas se consume.
+  if (usedBackupCodeHash) {
+    const remaining = (row.totp_backup_codes ?? []).filter((h) => h !== usedBackupCodeHash);
+    await query('UPDATE users SET totp_backup_codes = $1 WHERE id = $2', [remaining, row.id]);
+  }
+
+  const { totp_secret: _, totp_backup_codes: __, ...user } = row;
+  const jwtToken = signToken(user);
+  return { token: jwtToken, user };
+}
+
+/** Desactiva 2FA — exige password actual + un código válido (TOTP o backup). */
+export async function disableTotp(userId: string, password: string, code: string): Promise<{ message: string }> {
+  const row = await queryOne<{
+    password_hash:      string;
+    totp_enabled:       boolean;
+    totp_secret:        string | null;
+    totp_backup_codes:  string[] | null;
+  }>(
+    'SELECT password_hash, totp_enabled, totp_secret, totp_backup_codes FROM users WHERE id = $1',
+    [userId],
+  );
+  if (!row) throw createError('Usuario no encontrado', 404);
+  if (!row.totp_enabled || !row.totp_secret) {
+    throw createError('2FA no está activado', 400, 'TOTP_NOT_ENABLED');
+  }
+
+  const validPassword = await bcrypt.compare(password, row.password_hash);
+  if (!validPassword) {
+    throw createError('Contraseña incorrecta', 401);
+  }
+
+  const plainSecret = decryptSecret(deserializeEncryptedSecret(row.totp_secret));
+
+  const validCode = (await isValidTotpCode(plainSecret, code))
+    || (await findMatchingBackupCode(code, row.totp_backup_codes ?? [])) !== null;
+
+  if (!validCode) {
+    throw createError('Código inválido', 401);
+  }
+
+  await query(
+    'UPDATE users SET totp_enabled = FALSE, totp_secret = NULL, totp_backup_codes = NULL WHERE id = $1',
+    [userId],
+  );
+
+  return { message: '2FA desactivado' };
 }
 
 /**
@@ -257,8 +466,7 @@ export async function verifyTotpSetup(userId: string, code: string): Promise<{ b
   }
 
   const plainSecret = decryptSecret(deserializeEncryptedSecret(row.totp_secret));
-  const result       = await verifyTotpCode({ secret: plainSecret, token: code });
-  if (!result.valid) {
+  if (!(await isValidTotpCode(plainSecret, code))) {
     throw createError('Código inválido', 401, 'TOTP_INVALID_CODE');
   }
 
