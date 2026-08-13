@@ -8,8 +8,16 @@ module.exports = {
   // aplica el chequeo de seguridad de la base de datos.
   setupFiles: ['<rootDir>/test/setup/setTestEnv.js'],
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.test.json' }],
+    '^.+\\.[jt]sx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.test.json' }],
   },
+  // otplib (2FA) trae @scure/base como dependencia — ESM puro, sin build CJS
+  // (package.json: "type":"module", sin campo "exports"). Node 24 lo tolera
+  // vía su soporte nativo de require(esm), pero el CJS loader propio de Jest
+  // no lo tiene y explota con "Unexpected token 'export'" al toparse con su
+  // sintaxis ESM. Se excluye puntualmente de transformIgnorePatterns para
+  // que ts-jest lo transpile a CommonJS antes de ejecutarlo — el resto de
+  // node_modules se sigue ignorando (más rápido, no lo necesita).
+  transformIgnorePatterns: ['/node_modules/(?!@scure)/'],
   clearMocks: true,
   // Todos los archivos de test comparten UNA sola base Postgres real
   // (social_ads_db_test) y cada uno hace truncateAllTables() en su propio

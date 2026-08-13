@@ -75,6 +75,30 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
   }
 }
 
+export async function setupTotp(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const result = await authService.setupTotp(req.user!.userId, req.user!.email);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function verifyTotpSetup(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { code } = req.body as { code?: unknown };
+    if (!code || typeof code !== 'string') {
+      res.status(400).json({ error: 'Código requerido' });
+      return;
+    }
+
+    const result = await authService.verifyTotpSetup(req.user!.userId, code);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function resendVerification(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { email } = req.body as { email?: unknown };

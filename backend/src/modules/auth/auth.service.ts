@@ -2,9 +2,11 @@ import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { Resend } from 'resend';
+import { generateSecret as generateTotpSecret, verify as verifyTotpCode, generateURI as generateTotpURI } from 'otplib';
 import { query, queryOne } from '../../config/database';
 import { env } from '../../config/env';
 import { createError } from '../../middleware/errorHandler';
+import { encrypt as encryptSecret, decrypt as decryptSecret } from '../../utils/encryption';
 
 const resend = new Resend(env.RESEND_API_KEY || 're_test_placeholder');
 
@@ -68,6 +70,32 @@ function registerFailedLogin(ip: string, email: string): void {
 
 function clearLoginRateLimit(ip: string, email: string): void {
   loginRateLimiter.delete(loginRateLimitKey(ip, email));
+}
+
+// ── 2FA (TOTP) — opcional, sólo para cuentas admin ──────────────────────────
+const TOTP_ISSUER        = 'SpotFlow';
+const TOTP_BACKUP_CODES  = 8;
+
+// totp_secret se guarda cifrado con el mismo mecanismo AES-256-GCM que
+// client_credentials (utils/encryption.ts) — nunca en texto plano en DB.
+// EncryptedPayload son 3 campos (encrypted/iv/authTag); se concatenan en un
+// solo string para la columna TEXT única, en vez de 3 columnas separadas
+// como client_credentials, porque acá es un único secreto por usuario.
+function serializeEncryptedSecret(payload: { encrypted: string; iv: string; authTag: string }): string {
+  return `${payload.iv}:${payload.authTag}:${payload.encrypted}`;
+}
+
+function deserializeEncryptedSecret(stored: string): { encrypted: string; iv: string; authTag: string } {
+  const [iv, authTag, encrypted] = stored.split(':');
+  if (!iv || !authTag || !encrypted) {
+    throw createError('Secreto TOTP corrupto', 500);
+  }
+  return { iv, authTag, encrypted };
+}
+
+export interface TotpSetupResult {
+  secret:     string;
+  otpauthUrl: string;
 }
 
 export async function register(
@@ -181,6 +209,76 @@ export async function login(email: string, password: string, ip: string): Promis
   const { password_hash: _, ...user } = row;
   const jwtToken = signToken(user);
   return { token: jwtToken, user };
+}
+
+/**
+ * Genera un secreto TOTP nuevo y lo guarda como pendiente (totp_enabled
+ * sigue en FALSE hasta que verifyTotpSetup confirme un código válido).
+ * Si ya hay 2FA activo, rechaza — evita que una sesión robada pueda
+ * reemplazar el secreto en silencio; para eso primero hay que pasar por
+ * disableTotp, que exige password + código.
+ */
+export async function setupTotp(userId: string, email: string): Promise<TotpSetupResult> {
+  const row = await queryOne<{ totp_enabled: boolean }>(
+    'SELECT totp_enabled FROM users WHERE id = $1',
+    [userId],
+  );
+  if (!row) throw createError('Usuario no encontrado', 404);
+  if (row.totp_enabled) {
+    throw createError('2FA ya está activado. Desactívalo antes de generar un secreto nuevo.', 409, 'TOTP_ALREADY_ENABLED');
+  }
+
+  const secret          = generateTotpSecret();
+  const encryptedSecret = serializeEncryptedSecret(encryptSecret(secret));
+  await query('UPDATE users SET totp_secret = $1 WHERE id = $2', [encryptedSecret, userId]);
+
+  // El texto plano se devuelve acá (para el QR) y nunca se vuelve a exponer
+  // — de acá en más sólo vive cifrado en la columna totp_secret.
+  const otpauthUrl = generateTotpURI({ issuer: TOTP_ISSUER, label: email, secret });
+  return { secret, otpauthUrl };
+}
+
+/**
+ * Confirma el setup: valida el código de 6 dígitos contra el secreto
+ * pendiente, activa totp_enabled, y genera los códigos de respaldo — cuyo
+ * texto plano sólo existe en el valor de retorno de esta función, nunca más.
+ */
+export async function verifyTotpSetup(userId: string, code: string): Promise<{ backupCodes: string[] }> {
+  const row = await queryOne<{ totp_secret: string | null; totp_enabled: boolean }>(
+    'SELECT totp_secret, totp_enabled FROM users WHERE id = $1',
+    [userId],
+  );
+  if (!row) throw createError('Usuario no encontrado', 404);
+  if (row.totp_enabled) {
+    throw createError('2FA ya está activado', 409, 'TOTP_ALREADY_ENABLED');
+  }
+  if (!row.totp_secret) {
+    throw createError('Primero generá un secreto en /2fa/setup', 400, 'TOTP_SETUP_NOT_STARTED');
+  }
+
+  const plainSecret = decryptSecret(deserializeEncryptedSecret(row.totp_secret));
+  const result       = await verifyTotpCode({ secret: plainSecret, token: code });
+  if (!result.valid) {
+    throw createError('Código inválido', 401, 'TOTP_INVALID_CODE');
+  }
+
+  const backupCodes  = generateBackupCodes(TOTP_BACKUP_CODES);
+  const hashedCodes  = await Promise.all(backupCodes.map((c) => bcrypt.hash(c, 10)));
+
+  await query(
+    'UPDATE users SET totp_enabled = TRUE, totp_backup_codes = $1 WHERE id = $2',
+    [hashedCodes, userId],
+  );
+
+  return { backupCodes };
+}
+
+function generateBackupCodes(count: number): string[] {
+  return Array.from({ length: count }, () => {
+    const a = crypto.randomBytes(5).toString('hex');
+    const b = crypto.randomBytes(5).toString('hex');
+    return `${a}-${b}`;
+  });
 }
 
 export async function getMe(userId: string): Promise<AuthUser> {
