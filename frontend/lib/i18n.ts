@@ -537,6 +537,28 @@ const es: Dict = {
   strat_confirm_approve:  'Aprobar y publicar',
   strat_confirm_approving:'Publicando...',
   strat_confirm_back:     '← Volver a elegir',
+
+  // Admin settings — 2FA
+  admin_settings_title:       'Configuración de la cuenta',
+  admin_settings_sub:         'Preferencias y seguridad de tu cuenta de administrador.',
+  admin_2fa_title:            'Autenticación de dos factores (2FA)',
+  admin_2fa_desc:             'Pedí un código de tu app de autenticación además de la contraseña al iniciar sesión.',
+  admin_2fa_active:           'Activo',
+  admin_2fa_inactive:         'Inactivo',
+  admin_2fa_enable_btn:       'Activar 2FA',
+  admin_2fa_disable_btn:      'Desactivar 2FA',
+  admin_2fa_setup_title:      'Activar verificación en dos pasos',
+  admin_2fa_setup_intro:      'Escaneá este código con tu app de autenticación (Google Authenticator, Authy, 1Password, etc.), o ingresá el secreto manualmente si no podés escanear.',
+  admin_2fa_generating:       'Generando secreto...',
+  admin_2fa_manual_label:     'O ingresá este código manualmente',
+  admin_2fa_copy:             'Copiar',
+  admin_2fa_copied:           'Copiado',
+  admin_2fa_code_label:       'Código de 6 dígitos',
+  admin_2fa_confirm_activate: 'Confirmar y activar',
+  admin_2fa_backup_warning:   'Guardá estos códigos de respaldo en un lugar seguro. Cada uno sirve una sola vez para entrar si perdés acceso a tu app de autenticación — no vas a poder verlos de nuevo.',
+  admin_2fa_backup_done:      'Ya los guardé',
+  admin_2fa_disable_intro:    'Confirmá tu contraseña y un código válido (de tu app o uno de respaldo) para desactivar la verificación en dos pasos.',
+  admin_2fa_password_label:   'Contraseña actual',
 };
 
 const en: Dict = {
@@ -1066,6 +1088,28 @@ const en: Dict = {
   strat_confirm_approve:  'Approve & publish',
   strat_confirm_approving:'Publishing...',
   strat_confirm_back:     '← Back to choose',
+
+  // Admin settings — 2FA
+  admin_settings_title:       'Account settings',
+  admin_settings_sub:         'Preferences and security for your admin account.',
+  admin_2fa_title:            'Two-factor authentication (2FA)',
+  admin_2fa_desc:             'Require a code from your authenticator app in addition to your password when signing in.',
+  admin_2fa_active:           'Active',
+  admin_2fa_inactive:         'Inactive',
+  admin_2fa_enable_btn:       'Enable 2FA',
+  admin_2fa_disable_btn:      'Disable 2FA',
+  admin_2fa_setup_title:      'Set up two-factor verification',
+  admin_2fa_setup_intro:      "Scan this code with your authenticator app (Google Authenticator, Authy, 1Password, etc.), or enter the secret manually if you can't scan.",
+  admin_2fa_generating:       'Generating secret...',
+  admin_2fa_manual_label:     'Or enter this code manually',
+  admin_2fa_copy:             'Copy',
+  admin_2fa_copied:           'Copied',
+  admin_2fa_code_label:       '6-digit code',
+  admin_2fa_confirm_activate: 'Confirm and activate',
+  admin_2fa_backup_warning:   "Save these backup codes somewhere safe. Each one works once to sign in if you lose access to your authenticator app — you won't be able to see them again.",
+  admin_2fa_backup_done:      'I saved them',
+  admin_2fa_disable_intro:    'Confirm your password and a valid code (from your app or a backup code) to disable two-factor verification.',
+  admin_2fa_password_label:   'Current password',
 };
 
 const pt: Dict = {
@@ -1595,6 +1639,28 @@ const pt: Dict = {
   strat_confirm_approve:  'Aprovar e publicar',
   strat_confirm_approving:'Publicando...',
   strat_confirm_back:     '← Voltar para escolher',
+
+  // Admin settings — 2FA
+  admin_settings_title:       'Configurações da conta',
+  admin_settings_sub:         'Preferências e segurança da sua conta de administrador.',
+  admin_2fa_title:            'Autenticação de dois fatores (2FA)',
+  admin_2fa_desc:             'Peça um código do seu app autenticador além da senha ao entrar.',
+  admin_2fa_active:           'Ativo',
+  admin_2fa_inactive:         'Inativo',
+  admin_2fa_enable_btn:       'Ativar 2FA',
+  admin_2fa_disable_btn:      'Desativar 2FA',
+  admin_2fa_setup_title:      'Ativar verificação em duas etapas',
+  admin_2fa_setup_intro:      'Escaneie este código com seu app autenticador (Google Authenticator, Authy, 1Password, etc.), ou informe o segredo manualmente se não conseguir escanear.',
+  admin_2fa_generating:       'Gerando segredo...',
+  admin_2fa_manual_label:     'Ou informe este código manualmente',
+  admin_2fa_copy:             'Copiar',
+  admin_2fa_copied:           'Copiado',
+  admin_2fa_code_label:       'Código de 6 dígitos',
+  admin_2fa_confirm_activate: 'Confirmar e ativar',
+  admin_2fa_backup_warning:   'Guarde estes códigos de backup em um lugar seguro. Cada um funciona uma única vez para entrar se você perder o acesso ao seu app autenticador — você não poderá vê-los novamente.',
+  admin_2fa_backup_done:      'Já salvei',
+  admin_2fa_disable_intro:    'Confirme sua senha e um código válido (do seu app ou um código de backup) para desativar a verificação em duas etapas.',
+  admin_2fa_password_label:   'Senha atual',
 };
 
 export const translations: Record<Lang, Dict> = { es, en, pt };

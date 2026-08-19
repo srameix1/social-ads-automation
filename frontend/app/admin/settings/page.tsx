@@ -8,10 +8,12 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { PageLoader } from '@/components/ui/Spinner';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 type SetupStep = 'scan' | 'backupCodes';
 
 export default function AdminSettingsPage() {
+  const { t } = useLanguage();
   const [totpEnabled, setTotpEnabled] = useState(false);
   const [loading,     setLoading]     = useState(true);
 
@@ -100,9 +102,9 @@ export default function AdminSettingsPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Configuración de la cuenta</h1>
+        <h1 className="text-2xl font-bold text-white">{t('admin_settings_title')}</h1>
         <p className="text-slate-500 text-sm mt-1">
-          Preferencias y seguridad de tu cuenta de administrador.
+          {t('admin_settings_sub')}
         </p>
       </div>
 
@@ -110,40 +112,39 @@ export default function AdminSettingsPage() {
         <div className="flex items-start justify-between mb-4">
           <div>
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Autenticación de dos factores (2FA)
+              {t('admin_2fa_title')}
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Pedí un código de tu app de autenticación además de la contraseña al iniciar sesión.
+              {t('admin_2fa_desc')}
             </p>
           </div>
           <Badge variant={totpEnabled ? 'green' : 'gray'}>
-            {totpEnabled ? 'Activo' : 'Inactivo'}
+            {totpEnabled ? t('admin_2fa_active') : t('admin_2fa_inactive')}
           </Badge>
         </div>
 
         {totpEnabled ? (
           <Button variant="danger" size="sm" onClick={openDisable}>
-            Desactivar 2FA
+            {t('admin_2fa_disable_btn')}
           </Button>
         ) : (
           <Button variant="primary" size="sm" onClick={openSetup}>
-            Activar 2FA
+            {t('admin_2fa_enable_btn')}
           </Button>
         )}
       </div>
 
       {/* ── Modal de activación ──────────────────────────────────────────── */}
-      <Modal open={setupOpen} onClose={() => setSetupOpen(false)} title="Activar verificación en dos pasos">
+      <Modal open={setupOpen} onClose={() => setSetupOpen(false)} title={t('admin_2fa_setup_title')}>
         {setupStep === 'scan' && (
           <div className="space-y-4">
             <p className="text-xs text-slate-500">
-              Escaneá este código con tu app de autenticación (Google Authenticator, Authy, 1Password, etc.),
-              o ingresá el secreto manualmente si no podés escanear.
+              {t('admin_2fa_setup_intro')}
             </p>
 
             {setupBusy && !secret ? (
               <div className="flex justify-center py-6">
-                <span className="text-sm text-slate-500">Generando secreto...</span>
+                <span className="text-sm text-slate-500">{t('admin_2fa_generating')}</span>
               </div>
             ) : (
               <>
@@ -157,21 +158,21 @@ export default function AdminSettingsPage() {
 
                 <div>
                   <p className="text-xs font-medium text-slate-400 mb-1.5">
-                    O ingresá este código manualmente
+                    {t('admin_2fa_manual_label')}
                   </p>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 text-sm text-slate-200 bg-dark-700 border border-white/[0.08] rounded-lg px-3 py-2.5 font-mono break-all">
                       {secret}
                     </code>
                     <Button type="button" variant="secondary" size="sm" onClick={copySecret}>
-                      {secretCopied ? 'Copiado' : 'Copiar'}
+                      {secretCopied ? t('admin_2fa_copied') : t('admin_2fa_copy')}
                     </Button>
                   </div>
                 </div>
 
                 <form onSubmit={confirmSetup} className="space-y-4">
                   <Input
-                    label="Código de 6 dígitos"
+                    label={t('admin_2fa_code_label')}
                     type="text"
                     value={setupCode}
                     onChange={e => setSetupCode(e.target.value)}
@@ -184,7 +185,7 @@ export default function AdminSettingsPage() {
                   {setupError && <p className="text-xs text-rose-400">{setupError}</p>}
 
                   <Button type="submit" loading={setupBusy} className="w-full" size="lg">
-                    Confirmar y activar
+                    {t('admin_2fa_confirm_activate')}
                   </Button>
                 </form>
               </>
@@ -195,8 +196,7 @@ export default function AdminSettingsPage() {
         {setupStep === 'backupCodes' && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs px-4 py-3 rounded-xl">
-              Guardá estos códigos de respaldo en un lugar seguro. Cada uno sirve una sola vez para
-              entrar si perdés acceso a tu app de autenticación — no vas a poder verlos de nuevo.
+              {t('admin_2fa_backup_warning')}
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -216,21 +216,20 @@ export default function AdminSettingsPage() {
               size="lg"
               onClick={() => setSetupOpen(false)}
             >
-              Ya los guardé
+              {t('admin_2fa_backup_done')}
             </Button>
           </div>
         )}
       </Modal>
 
       {/* ── Modal de desactivación ───────────────────────────────────────── */}
-      <Modal open={disableOpen} onClose={() => setDisableOpen(false)} title="Desactivar 2FA">
+      <Modal open={disableOpen} onClose={() => setDisableOpen(false)} title={t('admin_2fa_disable_btn')}>
         <form onSubmit={confirmDisable} className="space-y-4">
           <p className="text-xs text-slate-500">
-            Confirmá tu contraseña y un código válido (de tu app o uno de respaldo) para desactivar
-            la verificación en dos pasos.
+            {t('admin_2fa_disable_intro')}
           </p>
           <Input
-            label="Contraseña actual"
+            label={t('admin_2fa_password_label')}
             type="password"
             value={disablePassword}
             onChange={e => setDisablePassword(e.target.value)}
@@ -239,17 +238,17 @@ export default function AdminSettingsPage() {
             required
           />
           <Input
-            label="Código"
+            label={t('verify2fa_code_label')}
             type="text"
             value={disableCode}
             onChange={e => setDisableCode(e.target.value)}
-            placeholder="123456 o código de respaldo"
+            placeholder={t('verify2fa_code_placeholder')}
             autoComplete="one-time-code"
             required
           />
           {disableError && <p className="text-xs text-rose-400">{disableError}</p>}
           <Button type="submit" variant="danger" loading={disableBusy} className="w-full" size="lg">
-            Desactivar 2FA
+            {t('admin_2fa_disable_btn')}
           </Button>
         </form>
       </Modal>
