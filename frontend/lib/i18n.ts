@@ -557,6 +557,7 @@ const es: Dict = {
   admin_2fa_confirm_activate: 'Confirmar y activar',
   admin_2fa_backup_warning:   'Guardá estos códigos de respaldo en un lugar seguro. Cada uno sirve una sola vez para entrar si perdés acceso a tu app de autenticación — no vas a poder verlos de nuevo.',
   admin_2fa_backup_done:      'Ya los guardé',
+  admin_2fa_backup_close_confirm: '¿Ya guardaste tus códigos de respaldo? No vas a poder verlos de nuevo.',
   admin_2fa_disable_intro:    'Confirmá tu contraseña y un código válido (de tu app o uno de respaldo) para desactivar la verificación en dos pasos.',
   admin_2fa_password_label:   'Contraseña actual',
 };
@@ -1108,6 +1109,7 @@ const en: Dict = {
   admin_2fa_confirm_activate: 'Confirm and activate',
   admin_2fa_backup_warning:   "Save these backup codes somewhere safe. Each one works once to sign in if you lose access to your authenticator app — you won't be able to see them again.",
   admin_2fa_backup_done:      'I saved them',
+  admin_2fa_backup_close_confirm: "Did you save your backup codes? You won't be able to see them again.",
   admin_2fa_disable_intro:    'Confirm your password and a valid code (from your app or a backup code) to disable two-factor verification.',
   admin_2fa_password_label:   'Current password',
 };
@@ -1659,6 +1661,7 @@ const pt: Dict = {
   admin_2fa_confirm_activate: 'Confirmar e ativar',
   admin_2fa_backup_warning:   'Guarde estes códigos de backup em um lugar seguro. Cada um funciona uma única vez para entrar se você perder o acesso ao seu app autenticador — você não poderá vê-los novamente.',
   admin_2fa_backup_done:      'Já salvei',
+  admin_2fa_backup_close_confirm: 'Você já salvou seus códigos de backup? Você não vai poder vê-los novamente.',
   admin_2fa_disable_intro:    'Confirme sua senha e um código válido (do seu app ou um código de backup) para desativar a verificação em duas etapas.',
   admin_2fa_password_label:   'Senha atual',
 };

@@ -72,6 +72,13 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const closeSetupModal = () => {
+    if (setupStep === 'backupCodes' && !window.confirm(t('admin_2fa_backup_close_confirm'))) {
+      return;
+    }
+    setSetupOpen(false);
+  };
+
   const copySecret = async () => {
     await navigator.clipboard.writeText(secret);
     setSecretCopied(true);
@@ -135,7 +142,7 @@ export default function AdminSettingsPage() {
       </div>
 
       {/* ── Modal de activación ──────────────────────────────────────────── */}
-      <Modal open={setupOpen} onClose={() => setSetupOpen(false)} title={t('admin_2fa_setup_title')}>
+      <Modal open={setupOpen} onClose={closeSetupModal} title={t('admin_2fa_setup_title')}>
         {setupStep === 'scan' && (
           <div className="space-y-4">
             <p className="text-xs text-slate-500">
