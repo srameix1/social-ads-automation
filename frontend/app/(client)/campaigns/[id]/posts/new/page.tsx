@@ -532,7 +532,7 @@ export default function NewPostPage() {
             <div>
               <label className="block text-xs text-slate-500 mb-1.5">{t('post_date_label')}</label>
               <input
-                type="date"
+                type="datetime-local"
                 value={scheduledDate}
                 onChange={e => setScheduledDate(e.target.value)}
                 className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-brand-500/60"
@@ -855,8 +855,8 @@ export default function NewPostPage() {
                 <div className="flex items-center justify-between px-4 py-2.5">
                   <span className="text-xs text-slate-500">{t('post_publication')}</span>
                   <span className="text-sm text-slate-200">
-                    {new Date(scheduledDate + 'T12:00:00').toLocaleDateString('es-MX', {
-                      day: 'numeric', month: 'long', year: 'numeric',
+                    {new Date(scheduledDate).toLocaleString('es-MX', {
+                      day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
                     })}
                   </span>
                 </div>

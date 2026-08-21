@@ -48,6 +48,7 @@ export interface ClientProfile {
   user_id:               string;
   business_name:         string;
   description:           string | null;
+  timezone:              string;
   photo_1_url:           string | null;
   photo_2_url:           string | null;
   photo_3_url:           string | null;

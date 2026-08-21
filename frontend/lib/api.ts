@@ -120,7 +120,7 @@ export const twoFactor = {
 // ── Client Profile ─────────────────────────────────────────────────────────
 export const clients = {
   getProfile: () => request<{ profile: import('./types').ClientProfile }>('/clients/profile'),
-  updateProfile: (data: { business_name: string; description: string }) =>
+  updateProfile: (data: { business_name: string; description: string; timezone?: string }) =>
     request('/clients/profile', { method: 'PUT', body: JSON.stringify(data) }),
   uploadPhotos: (formData: FormData) =>
     fetch(`${API_URL}/clients/profile/photos`, {

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import type { DeliveryMode } from '@/lib/types';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { TimezoneSelect } from '@/components/client/TimezoneSelect';
 import { PageLoader } from '@/components/ui/Spinner';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LOCALE_MAP } from '@/lib/i18n';
@@ -54,6 +55,7 @@ export default function ProfilePage() {
   const [editing,     setEditing]     = useState(false);
   const [editName,    setEditName]    = useState('');
   const [editDesc,    setEditDesc]    = useState('');
+  const [editTimezone, setEditTimezone] = useState('');
   const [editSaving,  setEditSaving]  = useState(false);
   const [editMsg,     setEditMsg]     = useState('');
 
@@ -72,6 +74,7 @@ export default function ProfilePage() {
   const startEditing = () => {
     setEditName(profile?.business_name ?? '');
     setEditDesc(profile?.description   ?? '');
+    setEditTimezone(profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone);
     setEditMsg('');
     setLogoFile(null);
     setLogoPreview(null);
@@ -109,8 +112,8 @@ export default function ProfilePage() {
           setProfile(p => p ? { ...p, brand_logo_url: res.profile!.brand_logo_url! } : p);
         }
       }
-      await clients.updateProfile({ business_name: editName.trim(), description: editDesc.trim() });
-      setProfile(p => p ? { ...p, business_name: editName.trim(), description: editDesc.trim() } : p);
+      await clients.updateProfile({ business_name: editName.trim(), description: editDesc.trim(), timezone: editTimezone });
+      setProfile(p => p ? { ...p, business_name: editName.trim(), description: editDesc.trim(), timezone: editTimezone } : p);
       if (logoPreview) URL.revokeObjectURL(logoPreview);
       setLogoFile(null);
       setLogoPreview(null);
@@ -204,6 +207,11 @@ export default function ProfilePage() {
               placeholder={t('step2_desc_ph')}
               rows={4}
             />
+            <TimezoneSelect
+              value={editTimezone}
+              onChange={setEditTimezone}
+              label={t('prof_timezone')}
+            />
 
             {/* Logo upload */}
             <div>
@@ -281,6 +289,10 @@ export default function ProfilePage() {
             <div>
               <p className="text-xs text-slate-600 mb-1">{t('prof_description')}</p>
               <p className="text-sm text-slate-400 leading-relaxed">{profile?.description || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-600 mb-1">{t('prof_timezone')}</p>
+              <p className="text-sm font-medium text-slate-200">{profile?.timezone || '—'}</p>
             </div>
             <div className="flex items-center gap-2 pt-1">
               <Badge variant={profile?.setup_completed ? 'green' : 'yellow'}>

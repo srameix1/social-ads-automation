@@ -301,7 +301,7 @@ const es: Dict = {
   post_basic_only:    'Imagen estática — incluida en tu plan básico',
   post_reel_used:     (used: number, quota: number) => `${used}/${quota} videos Veo 2 usados este mes`,
   post_reel_limit:    (used: number, quota: number) => `Límite de videos Veo 2 alcanzado (${used}/${quota})`,
-  post_date_label:    'Fecha de publicación (opcional)',
+  post_date_label:    'Fecha y hora de publicación (opcional)',
 
   // Posts/new page — format options
   fmt_image_label:    'Imagen estática',
@@ -382,6 +382,7 @@ const es: Dict = {
   prof_business_sub:       'Actualiza el nombre, descripción y marca que usaremos para tus anuncios.',
   prof_name:               'Nombre del negocio',
   prof_description:        'Descripción',
+  prof_timezone:           'Zona horaria',
   prof_complete:           '✓ Perfil completo',
   prof_pending:            '⚠ Setup pendiente',
   prof_edit:               'Editar',
@@ -439,6 +440,8 @@ const es: Dict = {
   step2_desc:    'Descripción',
   step2_desc_ph: 'Qué ofreces, tu propuesta de valor, qué te hace especial...',
   step2_desc_hint:'Cuanto más detallado, mejores resultados',
+  step2_timezone: 'Zona horaria',
+  step2_timezone_hint: 'La usamos para programar tus publicaciones a la hora local correcta.',
   step2_btn:     'Continuar →',
   step2_err:     'Nombre del negocio requerido',
   step3_title:      'Fotos de tu negocio',
@@ -853,7 +856,7 @@ const en: Dict = {
   post_basic_only:    'Static image — included in your basic plan',
   post_reel_used:     (used: number, quota: number) => `${used}/${quota} Veo 2 videos used this month`,
   post_reel_limit:    (used: number, quota: number) => `Veo 2 video limit reached (${used}/${quota})`,
-  post_date_label:    'Publish date (optional)',
+  post_date_label:    'Publish date & time (optional)',
 
   // Posts/new page — format options
   fmt_image_label:    'Static image',
@@ -934,6 +937,7 @@ const en: Dict = {
   prof_business_sub:       'Update the name, description and brand settings used in your ads.',
   prof_name:               'Business name',
   prof_description:        'Description',
+  prof_timezone:           'Timezone',
   prof_complete:           '✓ Profile complete',
   prof_edit:               'Edit',
   prof_save:               'Save changes',
@@ -991,6 +995,8 @@ const en: Dict = {
   step2_desc:    'Description',
   step2_desc_ph: 'What you offer, your value prop, what makes you special...',
   step2_desc_hint:'More detail = better results',
+  step2_timezone: 'Timezone',
+  step2_timezone_hint: 'We use this to schedule your posts at the correct local time.',
   step2_btn:     'Continue →',
   step2_err:     'Business name is required',
   step3_title:      'Business photos',
@@ -1367,7 +1373,7 @@ const pt: Dict = {
   post_basic_only:    'Imagem estática — incluída no seu plano básico',
   post_reel_used:     (used: number, quota: number) => `${used}/${quota} vídeos Veo 2 usados este mês`,
   post_reel_limit:    (used: number, quota: number) => `Limite de vídeos Veo 2 atingido (${used}/${quota})`,
-  post_date_label:    'Data de publicação (opcional)',
+  post_date_label:    'Data e hora de publicação (opcional)',
 
   // Posts/new page — format options
   fmt_image_label:    'Imagem estática',
@@ -1486,6 +1492,7 @@ const pt: Dict = {
   prof_business_sub:       'Atualize o nome, descrição e marca que usaremos nos seus anúncios.',
   prof_name:               'Nome do negócio',
   prof_description:        'Descrição',
+  prof_timezone:           'Fuso horário',
   prof_complete:           '✓ Perfil completo',
   prof_pending:            '⚠ Configuração pendente',
   prof_edit:               'Editar',
@@ -1543,6 +1550,8 @@ const pt: Dict = {
   step2_desc:    'Descrição',
   step2_desc_ph: 'O que você oferece, sua proposta de valor, o que te torna especial...',
   step2_desc_hint:'Quanto mais detalhado, melhores os resultados',
+  step2_timezone: 'Fuso horário',
+  step2_timezone_hint: 'Usamos isso para programar suas publicações no horário local correto.',
   step2_btn:     'Continuar →',
   step2_err:     'Nome do negócio é obrigatório',
   step3_title:      'Fotos do seu negócio',

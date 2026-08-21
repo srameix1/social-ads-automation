@@ -7,6 +7,7 @@ import { clients }         from '@/lib/api';
 import { ServicePlan }     from '@/lib/types';
 import { PlanSelector }    from './PlanSelector';
 import { BrandSetupForm }  from './BrandSetupForm';
+import { TimezoneSelect }  from './TimezoneSelect';
 import { useLanguage }     from '@/contexts/LanguageContext';
 import Image               from 'next/image';
 
@@ -20,6 +21,7 @@ export function ProfileSetupForm({ onComplete }: Props) {
   const [plan, setPlan]         = useState<ServicePlan | undefined>();
   const [businessName, setName] = useState('');
   const [description, setDesc]  = useState('');
+  const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [previews, setPreviews] = useState<(string | null)[]>([null, null, null]);
   const [files, setFiles]       = useState<(File | null)[]>([null, null, null]);
   const [error, setError]       = useState('');
@@ -62,7 +64,7 @@ export function ProfileSetupForm({ onComplete }: Props) {
     if (!businessName.trim()) { setError(t('step2_err')); return; }
     setLoading(true); setError('');
     try {
-      await clients.updateProfile({ business_name: businessName, description });
+      await clients.updateProfile({ business_name: businessName, description, timezone });
       setStep(3);
     } catch (err) { setError((err as Error).message); }
     finally { setLoading(false); }
@@ -152,6 +154,12 @@ export function ProfileSetupForm({ onComplete }: Props) {
             hint={t('step2_desc_hint')}
             rows={5}
           />
+          <TimezoneSelect
+            value={timezone}
+            onChange={setTimezone}
+            label={t('step2_timezone')}
+          />
+          <p className="text-xs text-slate-500 -mt-3">{t('step2_timezone_hint')}</p>
           {error && <p className="text-xs text-rose-400">{error}</p>}
           <Button onClick={saveProfile} loading={loading} className="w-full" size="lg">
             {t('step2_btn')}
