@@ -89,6 +89,7 @@ export async function enqueuePublishJobs(
   post:         ConfirmedPost,
   clientId:     string,
   variationUrl: string | null,
+  scheduledAt:  Date | null = null,
 ): Promise<void> {
   let mediaUrl = variationUrl;
   if (!mediaUrl) {
@@ -166,9 +167,15 @@ export async function enqueuePublishJobs(
         const data: PublishJobData = {
           publicationId: publication.id, clientId, platform, mediaUrl: absoluteMediaUrl, caption, mediaType,
         };
-        // Si boss.send() lanza acá, withTransaction hace ROLLBACK del INSERT de
-        // arriba: no queda una fila 'pending' huérfana sin job real detrás.
-        const jobId = await boss.send('publish-post', data);
+        // Si boss.send()/sendAfter() lanza acá, withTransaction hace ROLLBACK
+        // del INSERT de arriba: no queda una fila 'pending' huérfana sin job
+        // real detrás. scheduledAt ya viene resuelto a un instante UTC futuro
+        // (confirmPost descarta fechas pasadas/vacías) — sendAfter() lo pasa
+        // tal cual como startAfter (ver attorney.js: un Date se serializa con
+        // toISOString(), pg-boss lo agenda en su columna TIMESTAMPTZ).
+        const jobId = scheduledAt
+          ? await boss.sendAfter('publish-post', data, null, scheduledAt)
+          : await boss.send('publish-post', data);
 
         if (jobId) {
           await dbClient.query('UPDATE publications SET pgboss_job_id = $1 WHERE id = $2', [jobId, publication.id]);

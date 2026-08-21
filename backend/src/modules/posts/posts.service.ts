@@ -8,6 +8,7 @@ import { applyVideoOverlays } from '../../services/contentGeneration.service';
 import { enqueuePublishJobs } from '../../jobs/publishPost.job';
 import { logger } from '../../utils/logger';
 import { env } from '../../config/env';
+import { zonedTimeToUtc, DEFAULT_TIMEZONE } from '../../utils/timezone';
 import { PoolClient } from 'pg';
 
 export type PostStatus    = 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed';
@@ -113,11 +114,13 @@ export async function createPost(
     trial_posts_used:   number;
     trial_posts_limit:  number;
     courtesy_active:    boolean;
+    timezone:           string;
   }>(
     `SELECT campaigns.id, campaigns.max_posts,
        (SELECT COUNT(*)::int FROM posts WHERE campaign_id = campaigns.id) AS posts_used,
        cp.is_trial, cp.posts_used AS trial_posts_used, cp.trial_posts_limit,
-       (cp.is_courtesy AND cp.courtesy_expires_at > NOW()) AS courtesy_active
+       (cp.is_courtesy AND cp.courtesy_expires_at > NOW()) AS courtesy_active,
+       cp.timezone
      FROM campaigns
      JOIN client_profiles cp ON cp.user_id = campaigns.client_id
      WHERE campaigns.id = $1 AND campaigns.client_id = $2`,
@@ -144,11 +147,19 @@ export async function createPost(
   const validFormats: PostFormat[] = ['image', 'animated_video', 'reel'];
   if (!validFormats.includes(format)) throw createError('Formato inválido', 400);
 
+  // data.scheduled_date llega como fecha/hora "de pared" (sin offset) desde
+  // el input date/datetime-local del cliente — se convierte a instante UTC
+  // real acá, usando el timezone guardado en su perfil, para que confirmPost
+  // pueda comparar contra NOW() sin ambigüedad.
+  const scheduledAt = data.scheduled_date
+    ? zonedTimeToUtc(data.scheduled_date, cam.timezone || DEFAULT_TIMEZONE).toISOString()
+    : null;
+
   const [post] = await query<Post>(
     `INSERT INTO posts (campaign_id, platforms, format, scheduled_date)
      VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [campaignId, data.platforms, format, data.scheduled_date ?? null],
+    [campaignId, data.platforms, format, scheduledAt],
   );
 
   if (cam.is_trial) {
@@ -553,7 +564,13 @@ export async function confirmPost(
   );
 
   if (clientProfile?.delivery_mode === 'automatic') {
-    await enqueuePublishJobs(post, clientId, variationUrl);
+    // scheduled_date ya está en UTC real (convertido en createPost/updatePost
+    // con el timezone del cliente) — acá solo se compara contra el reloj.
+    // Pasada, vacía o inválida => comportamiento actual: publicación inmediata.
+    const scheduledAt = post.scheduled_date ? new Date(post.scheduled_date) : null;
+    const isFutureSchedule = !!scheduledAt && !isNaN(scheduledAt.getTime()) && scheduledAt.getTime() > Date.now();
+
+    await enqueuePublishJobs(post, clientId, variationUrl, isFutureSchedule ? scheduledAt : null);
   }
 
   return { post, variationUrl };
@@ -640,9 +657,11 @@ export async function updatePost(
     format:              PostFormat;
   }>,
 ): Promise<Post> {
-  const [existing] = await query<{ id: string }>(
-    `SELECT p.id FROM posts p
-     JOIN campaigns c ON c.id = p.campaign_id
+  const [existing] = await query<{ id: string; timezone: string }>(
+    `SELECT p.id, cp.timezone
+     FROM posts p
+     JOIN campaigns c        ON c.id = p.campaign_id
+     JOIN client_profiles cp ON cp.user_id = c.client_id
      WHERE p.id = $1 AND p.campaign_id = $2 AND c.client_id = $3`,
     [postId, campaignId, clientId],
   );
@@ -652,7 +671,12 @@ export async function updatePost(
   const values: unknown[] = [];
   let   i = 1;
 
-  if (data.scheduled_date      !== undefined) { fields.push(`scheduled_date = $${i++}`);      values.push(data.scheduled_date); }
+  if (data.scheduled_date      !== undefined) {
+    // Igual que en createPost: valor "de pared" sin offset, se convierte a
+    // UTC real con el timezone del cliente antes de guardar.
+    const scheduledAt = data.scheduled_date ? zonedTimeToUtc(data.scheduled_date, existing.timezone || DEFAULT_TIMEZONE).toISOString() : null;
+    fields.push(`scheduled_date = $${i++}`);      values.push(scheduledAt);
+  }
   if (data.status              !== undefined) { fields.push(`status = $${i++}`);              values.push(data.status); }
   if (data.platform            !== undefined) { fields.push(`platform = $${i++}`);            values.push(data.platform); }
   if (data.visual_variation_id !== undefined) { fields.push(`visual_variation_id = $${i++}`); values.push(data.visual_variation_id); }

@@ -1,5 +1,6 @@
 import { query, queryOne } from '../../config/database';
 import { createError } from '../../middleware/errorHandler';
+import { isValidTimeZone } from '../../utils/timezone';
 
 export type ServicePlan = 'basic' | 'professional' | 'premium';
 export type DeliveryMode = 'automatic' | 'manual';
@@ -9,6 +10,7 @@ export interface ClientProfile {
   user_id:                       string;
   business_name:                 string;
   description:                   string | null;
+  timezone:                      string;
   photo_1_url:                   string | null;
   photo_2_url:                   string | null;
   photo_3_url:                   string | null;
@@ -46,13 +48,18 @@ export async function updateProfile(
   userId:       string,
   businessName: string,
   description:  string,
+  timezone?:    string,
 ): Promise<ClientProfile> {
+  if (timezone !== undefined && !isValidTimeZone(timezone)) {
+    throw createError('Zona horaria inválida', 400);
+  }
+
   const profile = await queryOne<ClientProfile>(
     `UPDATE client_profiles
-     SET business_name = $1, description = $2
-     WHERE user_id = $3
+     SET business_name = $1, description = $2, timezone = COALESCE($3, timezone)
+     WHERE user_id = $4
      RETURNING *`,
-    [businessName, description, userId],
+    [businessName, description, timezone ?? null, userId],
   );
   if (!profile) throw createError('Perfil no encontrado', 404);
   return profile;

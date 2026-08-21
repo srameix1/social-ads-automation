@@ -77,10 +77,10 @@ export async function getMyProfile(req: Request, res: Response, next: NextFuncti
 
 export async function updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { business_name, description } = req.body;
+    const { business_name, description, timezone } = req.body;
     if (!business_name) { res.status(400).json({ error: 'Nombre del negocio requerido' }); return; }
 
-    const profile = await clientsService.updateProfile(req.user!.userId, business_name, description ?? '');
+    const profile = await clientsService.updateProfile(req.user!.userId, business_name, description ?? '', timezone);
     res.json({ profile });
   } catch (err) { next(err); }
 }
