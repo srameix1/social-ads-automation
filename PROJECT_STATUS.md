@@ -2,62 +2,59 @@
 
 Actualizado: 2026-08-23.
 
-## Proyecto y stack verificados
+## Contexto operativo
 
-- Frontend: Next.js 14, React 18, TypeScript y Tailwind CSS; imagen de producción definida en `frontend/Dockerfile` con salida standalone.
-- Backend: Node.js, Express y TypeScript; imagen de producción definida en `backend/Dockerfile`.
-- Datos y trabajos: PostgreSQL, `pg` y `pg-boss`; migraciones SQL en `backend/database/migrations/`.
+- `AGENTS.md` indica consultar primero este estado y usar `MEMORY.md` como memoria histórica acumulativa; las referencias antiguas a `PROJECT_MEMORY.md` fueron corregidas.
+- Frontend: Next.js 14, React 18, TypeScript y Tailwind CSS.
+- Backend: Node.js, Express y TypeScript; producción usa una imagen Node 22 Alpine.
+- Datos y trabajos: PostgreSQL, `pg` y `pg-boss`.
 
-## PostgreSQL e infraestructura
+## Producción e infraestructura
 
-- Producción utiliza PostgreSQL 17.11 en EasyPanel.
-- EasyPanel utiliza el dominio seguro `https://panel.spotflow.pro`.
-- Existe un registro DNS A para `panel.spotflow.pro` que apunta al VPS.
-- El servicio PostgreSQL de producción es `spotflow-db`.
-- La base de datos real es `social_ads_db` y su usuario es `social_ads_user`.
-- El entorno local usa `docker-compose.yml` con PostgreSQL 15 Alpine, pgAdmin, healthcheck y el volumen Docker nombrado `postgres_data`.
-- La aplicación acepta `DATABASE_URL`; si no existe, usa `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` y `DB_PASSWORD`.
-- En modo test existe una salvaguarda que exige que el nombre de la base contenga `_test` y permite `TEST_DATABASE_URL`.
-- Los Dockerfiles construyen frontend y backend por separado. El `docker-compose.yml` local solo define PostgreSQL y pgAdmin; no incluye frontend ni backend.
+- PostgreSQL de producción es 17.11 en el servicio EasyPanel `spotflow-db`; la base es `social_ads_db` y el usuario `social_ads_user`.
+- La configuración local usa PostgreSQL 15, pero no representa la versión de producción.
+- EasyPanel está accesible por HTTPS en `https://panel.spotflow.pro`; el DNS del subdominio apunta al VPS.
+- El panel administra todos los proyectos del VPS, no solo SpotFlow.
+- El token de Deployment Trigger del backend fue rotado; su valor no está documentado.
 
-## Backup y restauración verificados
+## Backups y restauración
 
-- EasyPanel tiene configurados dos backups automáticos para `social_ads_db`: Local Disk y Google Drive mediante el proveedor `spotflow-google-drive`.
-- El primer backup se generó correctamente en `spotflow/spotflow-db/2026-08-23T00:52:05.550Z.sql.gz`.
-- El archivo comprimido ocupa 13.9 kB.
-- El backup externo se ejecutó manualmente con éxito y se verificó directamente en Google Drive el archivo `spotflow/spotflow-db/2026-08-23T02:46:57.947Z.sql.gz`, de 13.9 kB.
-- La restauración fue comprobada en una base temporal independiente mediante el servicio `spotflow-db-restore-test`.
-- Se recuperaron 11 tablas, 2 usuarios y 2 perfiles.
-- Actualmente `campaigns`, `client_credentials`, `posts`, `publications`, `strategies` y `media_assets` tienen 0 registros.
-- La producción no fue alterada durante la prueba de restauración.
-- El servicio temporal `spotflow-db-restore-test` fue eliminado después de la comprobación.
-- El repositorio no contiene scripts propios de backup/restauración ni variables de backup; la automatización verificada reside en EasyPanel.
+- `social_ads_db` tiene backups automáticos en Local Disk y Google Drive mediante `spotflow-google-drive`.
+- Backup local verificado: `spotflow/spotflow-db/2026-08-23T00:52:05.550Z.sql.gz`.
+- Backup externo verificado directamente en Google Drive: `spotflow/spotflow-db/2026-08-23T02:46:57.947Z.sql.gz`.
+- Cada respaldo ocupa aproximadamente 13.9 kB.
+- Se restauró una copia en una base PostgreSQL 17 temporal e independiente mediante `spotflow-db-restore-test`; la verificación final se hizo con `psql` y no alteró producción.
+- La restauración contenía 11 tablas: `users=2`, `client_profiles=2` y 0 registros en `campaigns`, `client_credentials`, `posts`, `publications`, `strategies` y `media_assets`.
+- El servicio temporal de restauración fue eliminado.
 
-## Tareas programadas de la aplicación
+## bcrypt, pruebas y despliegue
 
-- El backend ejecuta limpieza cada 24 horas y un chequeo diario de cortesías a las 09:00.
-- Los trabajos persistentes de publicación se procesan mediante `pg-boss`.
-- Estas tareas de aplicación no realizan backups.
+- El backend usa bcrypt 6.0.0 y conserva `@types/bcrypt`; se eliminó la cadena vulnerable `bcrypt → @mapbox/node-pre-gyp → tar`.
+- `npm audit` terminó con 0 vulnerabilidades críticas, altas, moderadas o bajas.
+- El build fue exitoso; aprobaron 35 pruebas de autenticación y 41 pruebas en la suite completa.
+- Existen pruebas de compatibilidad con hashes de bcrypt 5 y de almacenamiento seguro durante el registro.
+- La imagen se comprobó con Node 22 Alpine y bcrypt 6.
+- El backend fue desplegado correctamente en EasyPanel y se verificó en producción el login de una cuenta existente.
+- La imagen Alpine no incluye `/bin/bash`; esto no representa una falla del servicio.
 
-## Actualización de bcrypt verificada
+## Git
 
-- El backend usa `bcrypt` 6.0.0; `@types/bcrypt` se conserva en 5.0.2.
-- Se añadió una prueba que confirma que bcrypt 6 verifica un hash generado previamente con bcrypt 5.1.1 y otra que valida que el registro almacena un hash verificable, nunca la contraseña en texto plano.
-- `npm audit` del backend terminó con 0 vulnerabilidades; desaparecieron la vulnerabilidad crítica y la alta de la cadena `bcrypt → @mapbox/node-pre-gyp → tar`.
-- El build del backend terminó correctamente.
-- Las pruebas de autenticación terminaron con 6 suites y 35 tests aprobados.
-- La suite completa del backend terminó con 7 suites y 41 tests aprobados.
-- La imagen local `spotflow-backend:bcrypt6-test` se construyó correctamente con Node 22 Alpine. Dentro de la imagen se verificaron Node 22.23.2, bcrypt 6.0.0 y una operación real de hash y comparación.
-- No se desplegó a producción ni se modificaron hashes existentes en PostgreSQL.
+- `main` está sincronizada con `origin/main` en el commit `3a91e51f1b504940f4fc302fe1f41be2f1c2645e` (`security: verify backups and upgrade bcrypt`).
+- El commit contiene la coordinación documental, la actualización de bcrypt y sus dos pruebas nuevas.
+- Configuraciones privadas, diagnósticos y artefactos multimedia locales permanecieron fuera del commit.
 
-## Pendientes reales
+## Pendientes prioritarios
 
-- Confirmar horario, zona horaria y política de retención.
-- Conservar de forma segura `ENCRYPTION_KEY`.
-- Evaluar el backup de archivos multimedia almacenados fuera de PostgreSQL.
-- Resolver la advertencia de rclone sobre el `client_id` compartido de Google Drive, que dejará de funcionar durante 2026.
+- Resolver durante 2026 la advertencia de rclone sobre el `client_id` compartido de Google Drive, evaluando una actualización de EasyPanel o un proveedor alternativo.
+- Confirmar horarios, zona horaria y retención efectiva de ambos backups.
+- Custodiar `ENCRYPTION_KEY` fuera del VPS y revisar el respaldo de `UPLOADS_DIR` y archivos multimedia.
+- Confirmar si EasyPanel todavía sirve por IP y evaluar desactivarlo tras validar HTTPS estable.
+- Configurar 2FA en EasyPanel.
+- Revisar si alguna integración o webhook usaba el Deployment Trigger anterior.
+- Investigar los errores históricos de firma de webhooks de Stripe sin asumir que siguen activos.
+- Ejecutar una auditoría de seguridad y continuar la fase MEDIUM: headers de seguridad, recuperación/restablecimiento de contraseña, paginación y ampliación de pruebas.
+- Diseñar posteriormente métricas y análisis; antes del lanzamiento, repetir la rotación general de tokens y credenciales según el plan del propietario.
 
-## Trabajo local preexistente observado
+## Próximo paso recomendado
 
-- `frontend/next-env.d.ts` ya estaba modificado.
-- Hay scripts diagnósticos, artefactos multimedia, salidas de pruebas y `.claude/settings.local.json` sin seguimiento; no fueron modificados durante esta actualización documental.
+Comenzar con una auditoría rápida de seguridad o con headers de seguridad, priorizando también 2FA en EasyPanel y la continuidad futura de los backups externos.
