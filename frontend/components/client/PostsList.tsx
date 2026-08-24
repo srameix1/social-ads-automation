@@ -115,7 +115,8 @@ export function PostsList({ posts, campaignId, publications = [] }: Props) {
             ?? STATUS_STYLES.draft;
           const inProgress  = IN_PROGRESS_STATUSES.has(post.workflow_status);
           const isConfirmed = post.workflow_status === 'confirmed';
-          const hasMedia    = !!post.selected_visual_url;
+          const isExpired   = !!post.selected_visual_expired_at;
+          const hasMedia    = !!post.selected_visual_url && !isExpired;
           const platforms   = post.platforms?.length ? post.platforms : (post.platform ? [post.platform] : []);
           const isVideo     = isVideoFormat(post.format);
           const postPubs    = pubsByPost.get(post.id) ?? [];
@@ -138,6 +139,12 @@ export function PostsList({ posts, campaignId, publications = [] }: Props) {
                     <svg className="w-5 h-5 text-white/80" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/>
                     </svg>
+                  </div>
+                ) : isExpired ? (
+                  <div className="w-full h-full flex items-center justify-center text-center px-0.5">
+                    <span className="text-[8px] font-bold uppercase tracking-wide leading-tight text-slate-500">
+                      {t('posts_media_expired')}
+                    </span>
                   </div>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-lg">

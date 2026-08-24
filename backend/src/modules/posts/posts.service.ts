@@ -69,6 +69,7 @@ interface VisualVariation {
   status:                string;
   visual_concept_variant: string | null;
   selected:              boolean;
+  expired_at:            string | null;
 }
 
 export interface PostWithDetails extends Post {
@@ -87,7 +88,8 @@ export async function listPosts(campaignId: string, clientId: string): Promise<P
 
   return query<Post>(
     `SELECT p.*,
-       (SELECT url FROM visual_variations WHERE post_id = p.id AND selected = TRUE LIMIT 1) AS selected_visual_url
+       (SELECT url FROM visual_variations WHERE post_id = p.id AND selected = TRUE LIMIT 1) AS selected_visual_url,
+       (SELECT expired_at FROM visual_variations WHERE post_id = p.id AND selected = TRUE LIMIT 1) AS selected_visual_expired_at
      FROM posts p
      WHERE p.campaign_id = $1
      ORDER BY p.scheduled_date ASC NULLS LAST, p.created_at DESC`,

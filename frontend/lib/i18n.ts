@@ -116,6 +116,7 @@ const es: Dict = {
   posts_view_ad:                'Ver anuncio →',
   posts_close:                  'Cerrar ✕',
   posts_preview_alt:            'Vista previa del anuncio',
+  posts_media_expired:          'Expirado',
 
   // TrialLimitModal
   trial_whatsapp_message: (email: string) => `Hola, mi período de prueba en SpotFlow se agotó y quiero conocer los planes disponibles. Mi correo es: ${email}`,
@@ -671,6 +672,7 @@ const en: Dict = {
   posts_view_ad:                'View ad →',
   posts_close:                  'Close ✕',
   posts_preview_alt:            'Ad preview',
+  posts_media_expired:          'Expired',
 
   // TrialLimitModal
   trial_whatsapp_message: (email: string) => `Hi, my free trial on SpotFlow has ended and I'd like to learn about the available plans. My email is: ${email}`,
@@ -1226,6 +1228,7 @@ const pt: Dict = {
   posts_view_ad:                'Ver anúncio →',
   posts_close:                  'Fechar ✕',
   posts_preview_alt:            'Pré-visualização do anúncio',
+  posts_media_expired:          'Expirado',
 
   // TrialLimitModal
   trial_whatsapp_message: (email: string) => `Olá, meu período de teste no SpotFlow terminou e eu gostaria de conhecer os planos disponíveis. Meu e-mail é: ${email}`,

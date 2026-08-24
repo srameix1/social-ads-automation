@@ -29,6 +29,7 @@ export interface PostSummary {
   format:              string;
   workflow_status:     string;
   selected_visual_url: string | null;
+  selected_visual_expired_at: string | null;
   created_at:          string;
   updated_at:          string;
 }
@@ -60,7 +61,8 @@ export async function getCampaign(id: string, clientId: string): Promise<Campaig
 
   const posts = await query<PostSummary>(
     `SELECT p.*,
-       (SELECT url FROM visual_variations WHERE post_id = p.id AND selected = TRUE LIMIT 1) AS selected_visual_url
+       (SELECT url FROM visual_variations WHERE post_id = p.id AND selected = TRUE LIMIT 1) AS selected_visual_url,
+       (SELECT expired_at FROM visual_variations WHERE post_id = p.id AND selected = TRUE LIMIT 1) AS selected_visual_expired_at
      FROM posts p
      WHERE p.campaign_id = $1
      ORDER BY p.scheduled_date ASC NULLS LAST, p.created_at DESC`,

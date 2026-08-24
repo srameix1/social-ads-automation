@@ -126,6 +126,7 @@ export interface Post {
   copy_generation_attempts:   number;
   visual_generation_attempts: number;
   selected_visual_url: string | null;
+  selected_visual_expired_at: string | null;
   published_at:        string | null;
   error_message:       string | null;
   created_at:          string;
