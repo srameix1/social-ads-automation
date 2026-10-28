@@ -10,6 +10,8 @@ router.post('/login',                controller.login);
 router.post('/login/verify-2fa',     controller.verifyLoginTwoFactor);
 router.post('/logout',               controller.logout);
 router.post('/resend-verification',  controller.resendVerification);
+router.post('/forgot-password',     controller.forgotPassword);
+router.post('/reset-password',      controller.resetPassword);
 router.get('/verify-email',          controller.verifyEmail);
 router.get('/me',                    authenticate, controller.me);
 

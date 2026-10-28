@@ -30,6 +30,22 @@ export default function CampaignDetailPage() {
       .catch(() => setPublications([])); // sin publicaciones todavía no es un error
   }, [id]);
 
+  // Analítica básica: se lee bajo demanda y se cachea 6h en el backend.
+  const [insights, setInsights] = useState<import('@/lib/types').CampaignInsights | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsRefreshing, setInsightsRefreshing] = useState(false);
+  const loadInsights = async (refresh = false) => {
+    if (refresh) setInsightsRefreshing(true); else setInsightsLoading(true);
+    try {
+      setInsights(await campaignsApi.getInsights(id, refresh));
+    } catch {
+      setInsights(null);
+    } finally {
+      setInsightsLoading(false); setInsightsRefreshing(false);
+    }
+  };
+  useEffect(() => { loadInsights(false); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (loading) return <PageLoader />;
   if (!campaign) return (
     <div className="text-center py-20 text-slate-500">
@@ -103,6 +119,70 @@ export default function CampaignDetailPage() {
           </Link>
         </div>
         <PostsList posts={campaign.posts ?? []} campaignId={id} publications={publications} />
+      </div>
+
+      {/* Resultados — solo publicaciones ya publicadas, sin promesas. */}
+      <div className="surface rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-200">{t('insights_title')}</h2>
+            <p className="text-xs text-slate-500 mt-1">{t('insights_sub')}</p>
+          </div>
+          <Button size="sm" disabled={insightsRefreshing} onClick={() => loadInsights(true)}>
+            {insightsRefreshing ? t('insights_refreshing') : t('insights_refresh')}
+          </Button>
+        </div>
+        {insightsLoading ? (
+          <p className="px-5 py-6 text-sm text-slate-500">…</p>
+        ) : !insights || insights.insights.length === 0 ? (
+          <p className="px-5 py-6 text-sm text-slate-500">{t('insights_empty')}</p>
+        ) : (
+          <div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-5 py-4">
+              {([
+                { label: t('insights_reach'), value: insights.totals.reach },
+                { label: t('insights_likes'), value: insights.totals.likes },
+                { label: t('insights_comments'), value: insights.totals.comments },
+                { label: t('insights_shares'), value: insights.totals.shares },
+              ]).map(stat => (
+                <div key={stat.label}>
+                  <p className="text-2xl font-bold text-white">{stat.value}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{stat.label}</p>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-white/[0.06]">
+              {insights.insights.map(item => (
+                <div key={item.publication_id} className="px-5 py-4 border-b border-white/[0.05] last:border-b-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-slate-200 capitalize">
+                      {PLATFORM_ICONS[item.platform] ?? ''} {item.platform}
+                    </span>
+                    {item.post_url && (
+                      <a href={item.post_url} target="_blank" rel="noreferrer" className="text-brand-400 text-xs">
+                        {t('insights_view_post')}
+                      </a>
+                    )}
+                  </div>
+                  {item.status === 'available' ? (
+                    <p className="text-xs text-slate-500 mt-1.5">
+                      {t('insights_reach')}: {item.reach ?? '—'} · {t('insights_likes')}: {item.likes ?? '—'} · {t('insights_comments')}: {item.comments ?? '—'} · {t('insights_shares')}: {item.shares ?? '—'}
+                    </p>
+                  ) : (
+                    <div className="mt-1.5">
+                      <p className="text-xs text-amber-300">
+                        {item.status === 'not_connected' ? t('insights_not_connected') : t('insights_not_available')}
+                      </p>
+                      {item.unavailable_reason && (
+                        <p className="text-xs text-slate-500 mt-1">{item.unavailable_reason}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

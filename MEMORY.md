@@ -59,3 +59,7 @@ El commit `3a91e51f1b504940f4fc302fe1f41be2f1c2645e` (`security: verify backups 
 - Diseñar más adelante métricas y análisis y repetir la rotación general de tokens y credenciales antes del lanzamiento.
 
 El próximo paso recomendado es iniciar una auditoría rápida de seguridad o implementar headers, dando prioridad paralela a 2FA en EasyPanel y a la continuidad de los backups externos.
+
+## 2026-10-28 — Bloque crítico: landing, recuperar contraseña y analítica básica (rama spotflow-critico, sin push)
+
+Landing pública real en `/` (antes solo redirigía a `/login`), con enfoque visual atrevido e imágenes de ejemplo con IA, en lenguaje simple, aclarando publicación orgánica sin anuncios pagos ni resultados prometidos, i18n ES/EN/PT, completa en móvil. Recuperar contraseña con token hasheado, 60 minutos, un solo uso, correo Resend y páginas nuevas. Analítica básica por campaña con caché de 6 horas: Facebook/Instagram con tokens ya guardados, TikTok marcado no disponible por falta de scope de lectura (sin cambiar scopes). Verificado: tsc backend y frontend OK y next build OK; Jest no corrió en el entorno de trabajo por falta de base de test. Pendiente: revisión de Santiago, migraciones 031/032, pruebas en vivo y dominio real del frontend (spotflow.app está aparcado).

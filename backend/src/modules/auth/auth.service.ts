@@ -538,6 +538,126 @@ export async function resendVerification(email: string): Promise<{ message: stri
   return GENERIC;
 }
 
+// ── Password reset ───────────────────────────────────────────────────────
+// Deliberately generic: the response is identical whether the email exists
+// or not, so the endpoint cannot be used to enumerate accounts. Only the
+// SHA-256 hash of the token is stored (never the raw token), the token is
+// single-use, and it expires after 60 minutes. Limitation, stated honestly:
+// JWT sessions are stateless, so a reset does not revoke sessions that are
+// already signed in — they keep working until their own expiry (7 days).
+const RESET_LIMIT = 3;
+const RESET_WINDOW_MS = 15 * 60 * 1000;
+const RESET_TTL_MS = 60 * 60 * 1000;
+const resetRateLimiter = new Map<string, { count: number; windowStart: number }>();
+
+function hashResetToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+export async function requestPasswordReset(email: string): Promise<{ message: string }> {
+  const GENERIC = { message: 'Si el correo existe, te hemos enviado un enlace para restablecer tu contraseña' };
+
+  const now = Date.now();
+  const key = email.toLowerCase();
+  const entry = resetRateLimiter.get(key);
+  if (entry) {
+    if (now - entry.windowStart < RESET_WINDOW_MS) {
+      if (entry.count >= RESET_LIMIT) {
+        throw createError('Demasiados intentos. Espera 15 minutos antes de volver a intentar.', 429);
+      }
+      entry.count++;
+    } else {
+      resetRateLimiter.set(key, { count: 1, windowStart: now });
+    }
+  } else {
+    resetRateLimiter.set(key, { count: 1, windowStart: now });
+  }
+
+  const user = await queryOne<{ id: string }>(
+    'SELECT id FROM users WHERE email = $1', [email],
+  );
+  if (!user) return GENERIC;
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + RESET_TTL_MS);
+  await query(
+    `UPDATE users SET reset_token_hash = $1, reset_token_expires_at = $2 WHERE id = $3`,
+    [hashResetToken(token), expiresAt, user.id],
+  );
+
+  await sendPasswordResetEmail(email, token);
+  return GENERIC;
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  if (!token || newPassword.length < 8) {
+    throw createError('La contraseña debe tener al menos 8 caracteres', 400);
+  }
+
+  const row = await queryOne<{ id: string; reset_token_expires_at: string }>(
+    `SELECT id, reset_token_expires_at FROM users WHERE reset_token_hash = $1`,
+    [hashResetToken(token)],
+  );
+  if (!row) throw createError('El enlace es inválido o ya fue utilizado', 400);
+  if (new Date(row.reset_token_expires_at) < new Date()) {
+    throw createError('El enlace expiró. Solicita uno nuevo.', 400);
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await query(
+    `UPDATE users SET password_hash = $1, reset_token_hash = NULL, reset_token_expires_at = NULL WHERE id = $2`,
+    [passwordHash, row.id],
+  );
+  return { message: 'Contraseña restablecida. Ya puedes iniciar sesión.' };
+}
+
+async function sendPasswordResetEmail(email: string, token: string): Promise<void> {
+  const resetUrl = `${env.FRONTEND_URL}/reset-password?token=${token}`;
+  const from = env.NODE_ENV === 'production'
+    ? 'noreply@spotflow.pro'
+    : 'onboarding@resend.dev';
+
+  await resend.emails.send({
+    from,
+    to: email,
+    subject: 'Restablece tu contraseña en SpotFlow',
+    html: `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;padding:40px 0">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="background:#1e293b;border-radius:16px;overflow:hidden">
+        <tr>
+          <td style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:32px;text-align:center">
+            <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700">SpotFlow</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:40px 32px">
+            <h2 style="margin:0 0 12px;color:#f1f5f9;font-size:20px;font-weight:600">Restablece tu contraseña</h2>
+            <p style="margin:0 0 28px;color:#94a3b8;font-size:15px;line-height:1.6">
+              Haz clic en el botón de abajo para elegir una contraseña nueva.
+            </p>
+            <a href="${resetUrl}"
+               style="display:inline-block;padding:14px 32px;color:#fff;font-size:15px;font-weight:600;text-decoration:none;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+              Elegir contraseña nueva
+            </a>
+            <p style="margin:28px 0 0;color:#64748b;font-size:13px;line-height:1.5">
+              Este enlace expira en <strong style="color:#94a3b8">60 minutos</strong> y solo se puede usar una vez.<br>
+              Si no pediste este cambio, puedes ignorar este email.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+  });
+}
+
 function signToken(user: AuthUser): string {
   return jwt.sign(
     { userId: user.id, email: user.email, role: user.role },

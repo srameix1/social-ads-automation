@@ -150,6 +150,12 @@ export default function LoginPage() {
               required
             />
 
+            <div className="text-right">
+              <Link href="/forgot-password" className="text-brand-400 hover:text-brand-300 text-sm font-medium">
+                {t('login_forgot')}
+              </Link>
+            </div>
+
             {error && (
               <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm px-4 py-3 rounded-xl">
                 <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">

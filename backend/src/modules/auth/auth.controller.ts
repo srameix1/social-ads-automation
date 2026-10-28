@@ -138,6 +138,38 @@ export async function disableTotp(req: Request, res: Response, next: NextFunctio
   }
 }
 
+export async function forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { email } = req.body as { email?: unknown };
+    if (!email || typeof email !== 'string') {
+      res.status(400).json({ error: 'Email requerido' });
+      return;
+    }
+    const result = await authService.requestPasswordReset(email.trim().toLowerCase());
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { token, password } = req.body as { token?: unknown; password?: unknown };
+    if (!token || typeof token !== 'string' || !password || typeof password !== 'string') {
+      res.status(400).json({ error: 'Token y contraseña nueva son requeridos' });
+      return;
+    }
+    if (password.length < 8) {
+      res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+      return;
+    }
+    const result = await authService.resetPassword(token, password);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function resendVerification(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { email } = req.body as { email?: unknown };
