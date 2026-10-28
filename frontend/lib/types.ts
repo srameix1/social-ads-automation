@@ -219,6 +219,25 @@ export interface Publication {
   created_at:        string;
 }
 
+export interface PublicationInsight {
+  publication_id: string;
+  platform: string;
+  post_url: string | null;
+  published_at: string | null;
+  reach: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  status: 'available' | 'unavailable' | 'not_connected';
+  unavailable_reason: string | null;
+  fetched_at: string | null;
+}
+
+export interface CampaignInsights {
+  insights: PublicationInsight[];
+  totals: { reach: number; likes: number; comments: number; shares: number };
+}
+
 export interface SubscriptionStatus {
   plan:              ServicePlan;
   status:            'inactive' | 'active' | 'past_due' | 'cancelled';

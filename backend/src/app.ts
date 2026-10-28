@@ -18,6 +18,7 @@ import oauthRoutes       from './modules/oauth/oauth.routes';
 import billingRoutes     from './modules/billing/billing.routes';
 import variationsRoutes  from './modules/variations/variations.routes';
 import postsRoutes, { postActionsRouter } from './modules/posts/posts.routes';
+import insightsRoutes from './modules/insights/insights.routes';
 
 const app = express();
 
@@ -79,6 +80,7 @@ app.use('/api/campaigns/:campaignId/variations',      variationsRoutes);
 app.use('/api/campaigns/:campaignId/posts',           postsRoutes);
 app.use('/api/posts',                                 postActionsRouter);
 app.use('/api/campaigns/:campaignId/publications',    publishingRoutes);
+app.use('/api/campaigns/:campaignId/insights',        insightsRoutes);
 app.use('/api/admin',                                 adminRoutes);
 app.use('/api/oauth',                                 oauthRoutes);
 app.use('/api/billing',                               billingRoutes);

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Auth pages: redirect logged-in users to their dashboard
-const AUTH_PATHS = ['/login', '/register', '/verify-email', '/verify-2fa'];
+const AUTH_PATHS = ['/login', '/register', '/verify-email', '/verify-2fa', '/forgot-password', '/reset-password'];
 // Legal pages: always accessible regardless of auth state
 const PUBLIC_PATHS = ['/privacy', '/terms'];
 // Require auth but are exempt from the onboarding redirect check in (client)/layout.tsx
@@ -15,6 +15,17 @@ export function middleware(req: NextRequest) {
 
   // Always-public routes (legal pages) → let through unconditionally
   if (PUBLIC_PATHS.some(p => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
+  // Landing (/) is public for visitors; logged-in users go to their panel,
+  // exactly like the auth pages below. Note: '/' must NOT be added to
+  // PUBLIC_PATHS, because startsWith('/') would make every route public.
+  if (pathname === '/') {
+    if (token && role) {
+      const dest = role === 'admin' ? '/admin' : '/dashboard';
+      return NextResponse.redirect(new URL(dest, req.url));
+    }
     return NextResponse.next();
   }
 

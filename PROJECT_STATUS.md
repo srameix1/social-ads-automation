@@ -1,60 +1,27 @@
 # Estado actual — SpotFlow / social-ads-automation
 
-Actualizado: 2026-08-23.
+Actualizado: 2026-10-28. Rama de trabajo `spotflow-critico` (local, SIN push, SIN despliegue).
 
-## Contexto operativo
+## Stack
 
-- `AGENTS.md` indica consultar primero este estado y usar `MEMORY.md` como memoria histórica acumulativa; las referencias antiguas a `PROJECT_MEMORY.md` fueron corregidas.
 - Frontend: Next.js 14, React 18, TypeScript y Tailwind CSS.
 - Backend: Node.js, Express y TypeScript; producción usa una imagen Node 22 Alpine.
-- Datos y trabajos: PostgreSQL, `pg` y `pg-boss`.
+- Datos y trabajos: PostgreSQL (producción 17.11, servicio EasyPanel `spotflow-db`, base `social_ads_db`), `pg` y `pg-boss`.
+- EasyPanel en `https://panel.spotflow.pro`; backend en `api.spotflow.pro`. `spotflow.app` está aparcado y NO es la página del producto.
 
-## Producción e infraestructura
+## Bloque crítico 2026-10-28 (en `spotflow-critico`, base `f71e9ba`)
 
-- PostgreSQL de producción es 17.11 en el servicio EasyPanel `spotflow-db`; la base es `social_ads_db` y el usuario `social_ads_user`.
-- La configuración local usa PostgreSQL 15, pero no representa la versión de producción.
-- EasyPanel está accesible por HTTPS en `https://panel.spotflow.pro`; el DNS del subdominio apunta al VPS.
-- El panel administra todos los proyectos del VPS, no solo SpotFlow.
-- El token de Deployment Trigger del backend fue rotado; su valor no está documentado.
+- LANDING: `frontend/app/page.tsx` ya no redirige a `/login`. Es una landing pública real, visual y distinta de las de otros productos: hero con collage de publicaciones de ejemplo creadas con IA (etiquetadas como ejemplos, no resultados), 3 pasos simples, ejemplo de publicación, aclaración de publicación orgánica (no anuncio pagado, sin presupuesto de anuncios, sin promesas de ventas o resultados), registro gratis sin plazos ni precios inventados, enlaces a `/privacy` y `/terms`. Completa en móvil. i18n ES/EN/PT. `/login` intacto; el middleware deja pasar `/` a visitantes y redirige a usuarios con sesión a su panel.
+- RECUPERAR CONTRASEÑA: `POST /api/auth/forgot-password` (respuesta genérica, sin enumerar cuentas; límite 3/15 min) y `POST /api/auth/reset-password`. Solo se guarda el hash SHA-256 del token, expira en 60 minutos, un solo uso, correo con Resend. Páginas `/forgot-password` y `/reset-password`, con enlace desde `/login`. Migración `031`. Limitación honesta: las sesiones JWT ya iniciadas no se revocan con el cambio (vencen a los 7 días).
+- ANALÍTICA BÁSICA: `GET /api/campaigns/:campaignId/insights` (con `?refresh=1`), cacheada 6 horas en la tabla nueva `publication_insights` (migración `032`) y mostrada en la página de la campaña. Facebook e Instagram: alcance (cuando el permiso lo permite), me gusta, comentarios y compartidos, leídos con los tokens ya guardados. TikTok: marcado como no disponible, porque los scopes actuales (`user.info.basic, video.publish, video.upload`) no incluyen lectura de estadísticas (haría falta algo como `video.list`); NO se cambiaron scopes.
+- Precios y planes sin cambios ($97/$197/$397). Sin secretos en código.
 
-## Backups y restauración
+## Verificación hecha en esta sesión (local, sin producción)
 
-- `social_ads_db` tiene backups automáticos en Local Disk y Google Drive mediante `spotflow-google-drive`.
-- Backup local verificado: `spotflow/spotflow-db/2026-08-23T00:52:05.550Z.sql.gz`.
-- Backup externo verificado directamente en Google Drive: `spotflow/spotflow-db/2026-08-23T02:46:57.947Z.sql.gz`.
-- Cada respaldo ocupa aproximadamente 13.9 kB.
-- Se restauró una copia en una base PostgreSQL 17 temporal e independiente mediante `spotflow-db-restore-test`; la verificación final se hizo con `psql` y no alteró producción.
-- La restauración contenía 11 tablas: `users=2`, `client_profiles=2` y 0 registros en `campaigns`, `client_credentials`, `posts`, `publications`, `strategies` y `media_assets`.
-- El servicio temporal de restauración fue eliminado.
+- Backend `tsc --noEmit`: OK. Frontend `tsc --noEmit` y `next build`: OK (28 rutas; `/`, `/forgot-password` y `/reset-password` como estáticas).
+- Jest NO pudo correrse aquí: no hay base Postgres de pruebas ni `.env.test.local` en este entorno (falla antes de ejecutar, por `JWT_SECRET` faltante). La prueba nueva `backend/test/auth/passwordReset.test.ts` sigue el patrón existente y debe correrse donde exista la base de test.
+- Pendiente de Santiago antes de cualquier push/Rebuild: revisar este diff, correr migraciones 031 y 032 en producción, probar en vivo forgot-password con un correo real, publicar una campaña y pulsar Actualizar en Resultados, y confirmar el dominio real del frontend en EasyPanel.
 
-## bcrypt, pruebas y despliegue
+## Pendientes anteriores que siguen vigentes
 
-- El backend usa bcrypt 6.0.0 y conserva `@types/bcrypt`; se eliminó la cadena vulnerable `bcrypt → @mapbox/node-pre-gyp → tar`.
-- `npm audit` terminó con 0 vulnerabilidades críticas, altas, moderadas o bajas.
-- El build fue exitoso; aprobaron 35 pruebas de autenticación y 41 pruebas en la suite completa.
-- Existen pruebas de compatibilidad con hashes de bcrypt 5 y de almacenamiento seguro durante el registro.
-- La imagen se comprobó con Node 22 Alpine y bcrypt 6.
-- El backend fue desplegado correctamente en EasyPanel y se verificó en producción el login de una cuenta existente.
-- La imagen Alpine no incluye `/bin/bash`; esto no representa una falla del servicio.
-
-## Git
-
-- `main` está sincronizada con `origin/main` en el commit `3a91e51f1b504940f4fc302fe1f41be2f1c2645e` (`security: verify backups and upgrade bcrypt`).
-- El commit contiene la coordinación documental, la actualización de bcrypt y sus dos pruebas nuevas.
-- Configuraciones privadas, diagnósticos y artefactos multimedia locales permanecieron fuera del commit.
-
-## Pendientes prioritarios
-
-- Resolver durante 2026 la advertencia de rclone sobre el `client_id` compartido de Google Drive, evaluando una actualización de EasyPanel o un proveedor alternativo.
-- Confirmar horarios, zona horaria y retención efectiva de ambos backups.
-- Custodiar `ENCRYPTION_KEY` fuera del VPS y revisar el respaldo de `UPLOADS_DIR` y archivos multimedia.
-- Confirmar si EasyPanel todavía sirve por IP y evaluar desactivarlo tras validar HTTPS estable.
-- Configurar 2FA en EasyPanel.
-- Revisar si alguna integración o webhook usaba el Deployment Trigger anterior.
-- Investigar los errores históricos de firma de webhooks de Stripe sin asumir que siguen activos.
-- Ejecutar una auditoría de seguridad y continuar la fase MEDIUM: headers de seguridad, recuperación/restablecimiento de contraseña, paginación y ampliación de pruebas.
-- Diseñar posteriormente métricas y análisis; antes del lanzamiento, repetir la rotación general de tokens y credenciales según el plan del propietario.
-
-## Próximo paso recomendado
-
-Comenzar con una auditoría rápida de seguridad o con headers de seguridad, priorizando también 2FA en EasyPanel y la continuidad futura de los backups externos.
+- 2FA en EasyPanel, respaldo de uploads, custodia de `ENCRYPTION_KEY` fuera del VPS, advertencia rclone/Google Drive 2026, y dividir `contentGeneration.service.ts` (3,233 líneas) en una fase posterior, no en este bloque.

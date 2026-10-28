@@ -41,7 +41,7 @@ async function request<T>(
     const errorCode      = body.message !== undefined ? body.error : undefined;
 
     if (res.status === 401 && typeof window !== 'undefined') {
-      const onPublicPage = ['/login', '/register'].some(p =>
+      const onPublicPage = ['/login', '/register', '/forgot-password', '/reset-password'].some(p =>
         window.location.pathname.startsWith(p),
       );
       if (!onPublicPage) {
@@ -97,6 +97,14 @@ export const auth = {
   resendVerification: (email: string) =>
     request<{ message: string }>(
       '/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) },
+    ),
+  forgotPassword: (email: string) =>
+    request<{ message: string }>(
+      '/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) },
+    ),
+  resetPassword: (token: string, password: string) =>
+    request<{ message: string }>(
+      '/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) },
     ),
   logout: () => request('/auth/logout', { method: 'POST' }),
   me:     () =>
@@ -192,6 +200,10 @@ export const campaigns = {
   getPublications: (campaignId: string) =>
     request<{ publications: import('./types').Publication[] }>(
       `/campaigns/${campaignId}/publications`,
+    ),
+  getInsights: (campaignId: string, refresh = false) =>
+    request<import('./types').CampaignInsights>(
+      `/campaigns/${campaignId}/insights${refresh ? '?refresh=1' : ''}`,
     ),
 };
 
